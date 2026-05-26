@@ -3,17 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bijli Tracker — SBPDCL Bill Analyser</title>
+<title>Bijli Tracker 2.0 — Advanced Analyser</title>
 <meta name="description" content="Smart electricity bill analyser for SBPDCL consumers">
 <meta name="theme-color" content="#0ea5e9">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230ea5e9'/%3E%3Ctext y='48' x='8' font-size='44'%3E⚡%3C/text%3E%3C/svg%3E">
 
-<!-- Fonts -->
+<!-- Fonts & Icons -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-<!-- Chart.js -->
+
+<!-- Chart.js & PDF.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
 <style>
 /* ═══════════════════════════════════════
@@ -40,1783 +43,784 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--body-bg); color: var(--text); min-height: 100vh; font-size: 14px; line-height: 1.6; }
+body::before { content:''; position:fixed; inset:0; z-index:-1; pointer-events:none; background: radial-gradient(ellipse 80% 50% at 0% 0%, rgba(14,165,233,.12) 0,transparent 60%), radial-gradient(ellipse 60% 40% at 100% 0%, rgba(234,179,8,.09) 0,transparent 55%); background-attachment: fixed; }
+.dark body::before { background: radial-gradient(ellipse 80% 50% at 0% 0%, rgba(14,165,233,.18) 0,transparent 55%), radial-gradient(ellipse 60% 40% at 100% 0%, rgba(234,179,8,.12) 0,transparent 50%); }
 
-body {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  background: var(--body-bg);
-  color: var(--text);
-  min-height: 100vh;
-  font-size: 15px;
-  line-height: 1.6;
-}
-
-/* Animated bg */
-body::before {
-  content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
-  background:
-    radial-gradient(ellipse 80% 50% at 0% 0%, rgba(14,165,233,.12) 0,transparent 60%),
-    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(234,179,8,.09) 0,transparent 55%),
-    radial-gradient(ellipse 50% 60% at 50% 100%, rgba(139,92,246,.08) 0,transparent 55%);
-  background-attachment: fixed;
-}
-.dark body::before {
-  background:
-    radial-gradient(ellipse 80% 50% at 0% 0%, rgba(14,165,233,.18) 0,transparent 55%),
-    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(234,179,8,.12) 0,transparent 50%),
-    radial-gradient(ellipse 50% 60% at 50% 100%, rgba(139,92,246,.1) 0,transparent 55%);
-}
-
-/* ═══════════════════════════════════════
-   SCROLLBAR
-═══════════════════════════════════════ */
 ::-webkit-scrollbar { width:6px; height:6px; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:var(--slate300); border-radius:4px; }
 .dark ::-webkit-scrollbar-thumb { background:var(--slate600); }
 
-/* ═══════════════════════════════════════
-   GLASS / CARD
-═══════════════════════════════════════ */
-.glass {
-  background: rgba(255,255,255,0.8);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.7);
-}
-.dark .glass {
-  background: rgba(15,23,42,0.8);
-  border: 1px solid rgba(255,255,255,0.06);
-}
-
-.card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius);
-  box-shadow: 0 1px 4px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.04);
-  transition: all .3s ease;
-}
-.card:hover { box-shadow: 0 4px 24px rgba(0,0,0,.09); }
-
-/* ═══════════════════════════════════════
-   HEADER
-═══════════════════════════════════════ */
-header {
-  position: sticky; top:0; z-index:50;
-  padding: 12px 20px;
-  display: flex; align-items:center; justify-content:space-between;
-  border-bottom: 1px solid rgba(255,255,255,.5);
-  box-shadow: 0 2px 20px rgba(0,0,0,.06);
-}
-.dark header { border-bottom-color: rgba(255,255,255,.06); }
-
-.logo { display:flex; align-items:center; gap:10px; }
-.logo-icon {
-  width:40px; height:40px; border-radius:12px;
-  background: linear-gradient(135deg,#0ea5e9,#6366f1);
-  display:flex; align-items:center; justify-content:center;
-  font-size:20px;
-  box-shadow: 0 4px 12px rgba(14,165,233,.35);
-}
-.logo h1 {
-  font-family: 'Syne', sans-serif;
-  font-size:1.3rem; font-weight:800; letter-spacing:-.02em;
-  background: linear-gradient(135deg,#0ea5e9,#6366f1);
-  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-}
-.logo p { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.12em; color:var(--text-muted); margin-top:1px; }
-
-.header-actions { display:flex; align-items:center; gap:8px; }
-.icon-btn {
-  width:38px; height:38px; border-radius:10px; border:1px solid var(--card-border);
-  background:var(--card-bg); color:var(--sky); cursor:pointer;
-  display:flex; align-items:center; justify-content:center;
-  font-size:16px; transition:all .2s; outline:none;
-}
-.icon-btn:hover { transform:scale(1.08); box-shadow:0 4px 12px rgba(0,0,0,.1); }
-
-/* ═══════════════════════════════════════
-   NAV TABS
-═══════════════════════════════════════ */
-.nav-wrap {
-  display: flex; gap:4px;
-  background: var(--slate100); padding:5px; border-radius:16px;
-  border:1px solid var(--slate200);
-}
-.dark .nav-wrap { background:var(--slate800); border-color:var(--slate700); }
-
-.nav-btn {
-  display:flex; align-items:center; gap:6px;
-  padding:7px 14px; border-radius:11px;
-  font-size:12px; font-weight:700; cursor:pointer; border:none;
-  background:transparent; color:var(--text-muted);
-  transition:all .2s; white-space:nowrap;
-}
-.nav-btn:hover { color:var(--sky); background:rgba(14,165,233,.06); }
-.nav-btn.active {
-  background:#fff; color:var(--sky);
-  box-shadow:0 2px 8px rgba(0,0,0,.1);
-}
-.dark .nav-btn.active { background:rgba(14,165,233,.15); box-shadow:none; }
-
-/* Mobile bottom nav */
-#bottom-nav {
-  display:none; position:fixed; bottom:0; left:0; right:0; z-index:60;
-  background:rgba(255,255,255,.95); backdrop-filter:blur(20px);
-  border-top:1px solid var(--slate200);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  box-shadow:0 -4px 24px rgba(0,0,0,.07);
-}
-.dark #bottom-nav {
-  background:rgba(15,23,42,.96); border-top-color:rgba(255,255,255,.06);
-}
-.bottom-nav-item {
-  flex:1; display:flex; flex-direction:column; align-items:center;
-  padding:8px 4px 6px; gap:3px; border:none; background:transparent;
-  cursor:pointer; color:var(--text-muted); transition:all .2s;
-}
-.bottom-nav-item span { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
-.bottom-nav-item.active { color:var(--sky); }
-.bottom-nav-item i { font-size:18px; line-height:1; }
-
-/* ═══════════════════════════════════════
-   MAIN LAYOUT
-═══════════════════════════════════════ */
-main { max-width:1200px; margin:0 auto; padding:24px 16px; }
-
-.tab-content { display:none; animation:fadeUp .35s ease; }
-.tab-content.active { display:block; }
-@keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
-
-/* ═══════════════════════════════════════
-   STAT CARDS
-═══════════════════════════════════════ */
-.stat-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-bottom:20px; }
-@media(min-width:768px) { .stat-grid { grid-template-columns:repeat(4,1fr); } }
-
-.stat-card {
-  border-radius:18px; padding:18px; position:relative;
-  overflow:hidden; color:#fff;
-  transition:transform .25s ease, box-shadow .25s ease;
-}
-.stat-card:hover { transform:translateY(-3px); }
-.stat-card .label { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; opacity:.8; margin-bottom:8px; }
-.stat-card .value { font-family:'JetBrains Mono',monospace; font-size:2rem; font-weight:700; line-height:1; }
-.stat-card .sub { font-size:11px; opacity:.75; margin-top:6px; font-weight:600; }
-.stat-card .icon-bg {
-  position:absolute; right:-8px; bottom:-10px;
-  font-size:5rem; opacity:.12; line-height:1; pointer-events:none;
-}
-
-.sc-sky   { background:linear-gradient(135deg,#0ea5e9,#6366f1); box-shadow:0 6px 20px rgba(14,165,233,.3); }
-.sc-volt  { background:linear-gradient(135deg,#eab308,#f97316); box-shadow:0 6px 20px rgba(234,179,8,.3); }
-.sc-green { background:linear-gradient(135deg,#10b981,#059669); box-shadow:0 6px 20px rgba(16,185,129,.3); }
-.sc-rose  { background:linear-gradient(135deg,#f43f5e,#ec4899); box-shadow:0 6px 20px rgba(244,63,94,.3); }
-
-/* ═══════════════════════════════════════
-   BILL HISTORY TABLE
-═══════════════════════════════════════ */
-.bill-table { width:100%; border-collapse:collapse; }
-.bill-table th {
-  font-size:10px; font-weight:800; text-transform:uppercase;
-  letter-spacing:.08em; color:var(--text-muted); padding:10px 14px;
-  border-bottom:2px solid var(--card-border); text-align:left;
-}
-.bill-table td {
-  padding:12px 14px; border-bottom:1px solid var(--card-border);
-  font-size:13px; font-weight:600; vertical-align:middle;
-}
-.bill-table tr:last-child td { border:none; }
-.bill-table tr:hover td { background:rgba(14,165,233,.04); }
-.bill-table .mono { font-family:'JetBrains Mono',monospace; font-size:13px; }
-
-/* ═══════════════════════════════════════
-   CHART CONTAINERS
-═══════════════════════════════════════ */
-.chart-wrap {
-  position:relative; padding:20px;
-  border-radius:var(--radius); background:var(--card-bg);
-  border:1px solid var(--card-border);
-}
-.chart-title {
-  font-size:13px; font-weight:800; color:var(--text);
-  margin-bottom:16px; display:flex; align-items:center; gap:8px;
-}
-.chart-title .badge {
-  font-size:9px; padding:2px 8px; border-radius:999px;
-  background:rgba(14,165,233,.1); color:var(--sky);
-  text-transform:uppercase; letter-spacing:.06em;
-}
-canvas { max-height:260px; }
-
-/* ═══════════════════════════════════════
-   SECTION TITLE
-═══════════════════════════════════════ */
-.sec-title {
-  font-size:10px; font-weight:900; text-transform:uppercase;
-  letter-spacing:.12em; color:var(--text-muted);
-  display:flex; align-items:center; gap:10px; margin-bottom:14px;
-}
+/* Components */
+.glass { background: rgba(255,255,255,0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.7); }
+.dark .glass { background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.06); }
+.card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,.02); transition: all .3s ease; }
+.card:hover { box-shadow: 0 8px 24px rgba(0,0,0,.06); }
+.sec-title { font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.12em; color:var(--text-muted); display:flex; align-items:center; gap:10px; margin-bottom:14px; }
 .sec-title::after { content:''; flex:1; height:1px; background:var(--slate200); }
 .dark .sec-title::after { background:var(--slate700); }
 
-/* ═══════════════════════════════════════
-   INSIGHT CARDS
-═══════════════════════════════════════ */
-.insight-grid { display:grid; gap:12px; }
-@media(min-width:600px) { .insight-grid { grid-template-columns:1fr 1fr; } }
-@media(min-width:1000px) { .insight-grid { grid-template-columns:1fr 1fr 1fr; } }
-
-.insight-card {
-  padding:16px; border-radius:14px;
-  border:1px solid var(--card-border); background:var(--card-bg);
-  display:flex; align-items:flex-start; gap:12px;
-}
-.insight-icon {
-  width:40px; height:40px; border-radius:12px;
-  display:flex; align-items:center; justify-content:center;
-  font-size:1.2rem; flex-shrink:0;
-}
-.insight-card h4 { font-size:13px; font-weight:800; margin-bottom:2px; }
-.insight-card p { font-size:11px; color:var(--text-muted); font-weight:600; line-height:1.5; }
-
-/* ═══════════════════════════════════════
-   SOLAR METER
-═══════════════════════════════════════ */
-.solar-arc {
-  width:180px; height:90px; margin:0 auto 16px;
-  position:relative; overflow:hidden;
-}
-.solar-arc::before {
-  content:''; position:absolute; bottom:0; left:0; right:0; height:180px;
-  border-radius:180px 180px 0 0;
-  border:18px solid rgba(14,165,233,.12);
-}
-.solar-fill {
-  position:absolute; bottom:0; left:0; right:0; height:180px;
-  border-radius:180px 180px 0 0;
-  border:18px solid transparent;
-  border-top-color:var(--volt); border-left-color:var(--volt); border-right-color:var(--volt);
-  transform-origin:center bottom;
-  transition:transform .8s cubic-bezier(.34,1.56,.64,1);
-}
-.solar-center {
-  position:absolute; bottom:0; left:50%; transform:translateX(-50%);
-  text-align:center; padding-bottom:4px;
-}
-.solar-center .big { font-family:'JetBrains Mono',monospace; font-size:1.6rem; font-weight:700; color:var(--volt); }
-.solar-center .sml { font-size:9px; font-weight:800; text-transform:uppercase; color:var(--text-muted); }
-
-/* ═══════════════════════════════════════
-   BADGE PILL
-═══════════════════════════════════════ */
-.pill {
-  display:inline-flex; align-items:center; gap:5px;
-  font-size:10px; font-weight:800; text-transform:uppercase;
-  letter-spacing:.05em; padding:3px 10px; border-radius:999px;
-}
-.pill-sky   { background:rgba(14,165,233,.12); color:var(--sky); }
-.pill-green { background:rgba(16,185,129,.12); color:var(--emerald); }
-.pill-red   { background:rgba(244,63,94,.12); color:var(--rose); }
-.pill-volt  { background:rgba(234,179,8,.12); color:var(--volt-d); }
-.dark .pill-volt { color:var(--volt); }
-
-/* ═══════════════════════════════════════
-   BUTTON
-═══════════════════════════════════════ */
-.btn-primary {
-  background:linear-gradient(135deg,var(--sky),#6366f1);
-  color:#fff; border:none; border-radius:12px;
-  padding:10px 22px; font-weight:800; font-size:13px;
-  cursor:pointer; display:inline-flex; align-items:center; gap:8px;
-  box-shadow:0 4px 14px rgba(14,165,233,.3);
-  transition:all .25s; font-family:'Plus Jakarta Sans',sans-serif;
-}
-.btn-primary:hover { filter:brightness(1.08); transform:translateY(-1px); }
-
-.btn-ghost {
-  background:transparent; border:1.5px solid var(--card-border);
-  color:var(--text-muted); border-radius:12px;
-  padding:9px 18px; font-weight:700; font-size:12px; cursor:pointer;
-  transition:all .2s; font-family:'Plus Jakarta Sans',sans-serif;
-}
+/* Buttons */
+.btn-primary { background:linear-gradient(135deg,var(--sky),#6366f1); color:#fff; border:none; border-radius:10px; padding:8px 18px; font-weight:800; font-size:12px; cursor:pointer; display:inline-flex; align-items:center; gap:8px; box-shadow:0 4px 14px rgba(14,165,233,.3); transition:all .2s; font-family:inherit; }
+.btn-primary:hover { transform:translateY(-1px); filter:brightness(1.1); }
+.btn-ghost { background:transparent; border:1px solid var(--card-border); color:var(--text-muted); border-radius:10px; padding:8px 16px; font-weight:700; font-size:12px; cursor:pointer; transition:all .2s; font-family:inherit; }
 .btn-ghost:hover { border-color:var(--sky); color:var(--sky); background:rgba(14,165,233,.04); }
 
-/* ═══════════════════════════════════════
-   FIREBASE/SETUP BANNER
-═══════════════════════════════════════ */
-#setup-banner {
-  border-radius:16px; padding:16px 20px; margin-bottom:20px;
-  background:linear-gradient(135deg,rgba(234,179,8,.1),rgba(249,115,22,.1));
-  border:1px solid rgba(234,179,8,.3);
-  display:flex; align-items:flex-start; gap:12px;
-}
-#setup-banner i { color:var(--volt); font-size:1.2rem; margin-top:2px; flex-shrink:0; }
-#setup-banner h4 { font-size:13px; font-weight:800; margin-bottom:2px; }
-#setup-banner p { font-size:11px; color:var(--text-muted); font-weight:600; line-height:1.6; }
-#setup-banner code {
-  background:rgba(234,179,8,.12); padding:1px 6px; border-radius:4px;
-  font-family:'JetBrains Mono',monospace; font-size:11px;
-}
+/* Header & Acc Switcher */
+header { position: sticky; top:0; z-index:50; padding: 12px 20px; display: flex; align-items:center; justify-content:space-between; border-bottom: 1px solid rgba(255,255,255,.5); }
+.dark header { border-bottom-color: rgba(255,255,255,.06); }
+.logo h1 { font-family: 'Syne', sans-serif; font-size:1.2rem; font-weight:800; background: linear-gradient(135deg,#0ea5e9,#6366f1); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.acc-select { appearance:none; background:var(--slate100) url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") no-repeat right 10px center; background-size: 14px; padding:6px 30px 6px 14px; border-radius:12px; border:1px solid var(--slate200); font-size:11px; font-weight:800; color:var(--text); cursor:pointer; font-family:inherit; outline:none; }
+.dark .acc-select { background-color:var(--slate800); border-color:var(--slate700); }
 
-/* ═══════════════════════════════════════
-   EMPTY STATE
-═══════════════════════════════════════ */
-.empty-state {
-  text-align:center; padding:56px 24px;
-  color:var(--text-muted);
-}
-.empty-state .emoji { font-size:3.5rem; display:block; margin-bottom:12px; opacity:.6; }
-.empty-state h3 { font-size:1.1rem; font-weight:800; margin-bottom:6px; color:var(--text); }
-.empty-state p { font-size:12px; font-weight:600; }
+/* Navigation */
+.nav-wrap { display: flex; gap:4px; background: var(--slate100); padding:4px; border-radius:12px; border:1px solid var(--slate200); }
+.dark .nav-wrap { background:var(--slate800); border-color:var(--slate700); }
+.nav-btn { display:flex; align-items:center; gap:6px; padding:6px 14px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; border:none; background:transparent; color:var(--text-muted); transition:all .2s; }
+.nav-btn.active { background:#fff; color:var(--sky); box-shadow:0 2px 8px rgba(0,0,0,.08); }
+.dark .nav-btn.active { background:rgba(14,165,233,.15); box-shadow:none; }
+.tab-content { display:none; animation:fadeUp .3s ease; }
+.tab-content.active { display:block; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 
-/* ═══════════════════════════════════════
-   MODAL
-═══════════════════════════════════════ */
-.modal-overlay {
-  position:fixed; inset:0; background:rgba(0,0,0,.55);
-  z-index:200; display:flex; align-items:center; justify-content:center;
-  padding:16px; backdrop-filter:blur(6px);
-  animation:fadeIn .2s ease;
-}
-@keyframes fadeIn { from{opacity:0} to{opacity:1} }
-.modal-box {
-  background:var(--card-bg); border:1px solid var(--card-border);
-  border-radius:24px; width:100%; max-width:480px;
-  max-height:90vh; overflow-y:auto;
-  box-shadow:0 24px 80px rgba(0,0,0,.3);
-  animation:slideUp .3s ease;
-}
-@keyframes slideUp { from{transform:translateY(20px)} to{transform:translateY(0)} }
-.modal-header {
-  padding:20px 24px 16px;
-  border-bottom:1px solid var(--card-border);
-  display:flex; align-items:center; justify-content:space-between;
-}
-.modal-header h3 { font-size:1rem; font-weight:800; }
-.modal-body { padding:20px 24px; }
-.modal-footer { padding:16px 24px; border-top:1px solid var(--card-border); display:flex; gap:10px; justify-content:flex-end; }
+/* Stat Cards */
+.stat-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:20px; }
+@media(min-width:768px) { .stat-grid { grid-template-columns:repeat(4,1fr); } }
+.stat-card { border-radius:16px; padding:16px; position:relative; overflow:hidden; color:#fff; }
+.stat-card .label { font-size:10px; font-weight:800; text-transform:uppercase; opacity:.8; margin-bottom:4px; }
+.stat-card .value { font-family:'JetBrains Mono',monospace; font-size:1.8rem; font-weight:700; line-height:1; }
+.stat-card .icon-bg { position:absolute; right:-10px; bottom:-10px; font-size:4rem; opacity:.15; pointer-events:none; }
+.sc-sky { background:linear-gradient(135deg,#0ea5e9,#6366f1); }
+.sc-volt { background:linear-gradient(135deg,#eab308,#f97316); }
+.sc-green { background:linear-gradient(135deg,#10b981,#059669); }
+.sc-rose { background:linear-gradient(135deg,#f43f5e,#ec4899); }
 
-/* ═══════════════════════════════════════
-   FORM
-═══════════════════════════════════════ */
-.field { margin-bottom:14px; }
-.field label { display:block; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--text-muted); margin-bottom:6px; }
-.field input, .field select, .field textarea {
-  width:100%; padding:10px 14px; border-radius:12px;
-  border:1.5px solid var(--card-border); background:var(--slate50);
-  color:var(--text); font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:13px; font-weight:600; outline:none;
-  transition:border-color .2s;
-}
-.field input:focus, .field select:focus { border-color:var(--sky); }
-.dark .field input, .dark .field select { background:rgba(255,255,255,.05); }
+/* Charts & Insight Cards */
+.chart-wrap { position:relative; padding:16px; border-radius:var(--radius); background:var(--card-bg); border:1px solid var(--card-border); margin-bottom:16px;}
+.chart-title { font-size:12px; font-weight:800; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between;}
+.insight-grid { display:grid; gap:12px; grid-template-columns:1fr; }
+@media(min-width:768px) { .insight-grid { grid-template-columns:repeat(3,1fr); } }
+.insight-card { padding:14px; border-radius:14px; border:1px solid var(--card-border); background:var(--card-bg); display:flex; gap:12px; align-items:start;}
+.insight-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
 
-/* ═══════════════════════════════════════
-   TOAST
-═══════════════════════════════════════ */
-#toast {
-  position:fixed; top:80px; right:16px; z-index:300;
-  background:var(--slate900); color:#fff;
-  padding:12px 18px; border-radius:12px; font-size:13px; font-weight:700;
-  display:flex; align-items:center; gap:8px; transform:translateX(120%);
-  transition:transform .35s cubic-bezier(.34,1.56,.64,1);
-  max-width:320px; box-shadow:0 8px 32px rgba(0,0,0,.3);
-}
+/* File Drop Zone */
+.drop-zone { border:2px dashed var(--sky); border-radius:20px; padding:40px 20px; text-align:center; background:rgba(14,165,233,.03); cursor:pointer; transition:all .2s; }
+.drop-zone:hover, .drop-zone.dragover { background:rgba(14,165,233,.08); border-color:var(--sky-d); }
+
+/* Tables & Forms */
+.bill-table { width:100%; border-collapse:collapse; text-align:left; }
+.bill-table th { font-size:10px; font-weight:800; text-transform:uppercase; color:var(--text-muted); padding:10px; border-bottom:2px solid var(--card-border); }
+.bill-table td { padding:10px; border-bottom:1px solid var(--card-border); font-size:12px; font-weight:600; }
+.field { margin-bottom:12px; }
+.field label { display:block; font-size:10px; font-weight:800; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px; }
+.field input, .field select, .field textarea { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--card-border); background:var(--slate50); color:var(--text); font-size:12px; font-weight:600; outline:none; font-family:inherit; }
+.dark .field input, .dark .field select, .dark .field textarea { background:rgba(255,255,255,.05); }
+
+/* Modals & Toasts */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; display:flex; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(4px); animation:fadeIn .2s; }
+.modal-box { background:var(--card-bg); border:1px solid var(--card-border); border-radius:20px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; box-shadow:0 20px 40px rgba(0,0,0,.3); }
+#toast { position:fixed; top:80px; right:16px; z-index:300; background:var(--slate900); color:#fff; padding:12px 16px; border-radius:10px; font-size:12px; font-weight:700; transform:translateX(150%); transition:transform .3s; display:flex; gap:8px; align-items:center;}
 #toast.show { transform:translateX(0); }
-.dark #toast { background:var(--slate700); }
 
-/* ═══════════════════════════════════════
-   SETTINGS
-═══════════════════════════════════════ */
-.settings-row {
-  display:flex; align-items:flex-start; justify-content:space-between;
-  padding:14px 0; border-bottom:1px solid var(--card-border); gap:16px;
-}
-.settings-row:last-child { border:none; }
-.settings-row h4 { font-size:13px; font-weight:800; margin-bottom:2px; }
-.settings-row p { font-size:11px; color:var(--text-muted); font-weight:600; }
-.settings-row .right { flex-shrink:0; }
-
-/* TOGGLE */
-.toggle { position:relative; width:44px; height:24px; }
-.toggle input { opacity:0; width:0; height:0; }
-.toggle-slider {
-  position:absolute; inset:0; background:var(--slate300); border-radius:999px;
-  cursor:pointer; transition:.3s;
-}
-.toggle-slider::before {
-  content:''; position:absolute; left:3px; top:3px;
-  width:18px; height:18px; border-radius:50%; background:#fff;
-  transition:.3s; box-shadow:0 2px 4px rgba(0,0,0,.2);
-}
-input:checked + .toggle-slider { background:var(--sky); }
-input:checked + .toggle-slider::before { transform:translateX(20px); }
-
-/* ═══════════════════════════════════════
-   RESPONSIVE
-═══════════════════════════════════════ */
-@media(max-width:767px) {
-  #bottom-nav { display:flex; }
-  main { padding-bottom:calc(72px + env(safe-area-inset-bottom, 0px)); }
-  .nav-wrap { display:none; }
-  header { padding:10px 14px; }
-  .logo h1 { font-size:1.1rem; }
-  .stat-card .value { font-size:1.6rem; }
-}
-@media(min-width:768px) {
-  main { padding:28px 24px; }
-}
+/* Util */
+.pill { padding:3px 8px; border-radius:999px; font-size:9px; font-weight:800; text-transform:uppercase; }
+.mono { font-family:'JetBrains Mono',monospace; }
 </style>
 </head>
 <body>
 
-<!-- TOAST -->
-<div id="toast">✅ Saved!</div>
+<div id="toast"><i class="fa-solid fa-circle-check"></i> <span id="toast-msg">Success</span></div>
 
-<!-- HEADER -->
 <header class="glass">
-  <div class="logo">
-    <div class="logo-icon">⚡</div>
-    <div>
-      <h1>Bijli Tracker</h1>
-      <p>SBPDCL Bill Analyser</p>
-    </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="width:36px;height:36px;background:linear-gradient(135deg,#0ea5e9,#6366f1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 10px rgba(14,165,233,.3)">⚡</div>
+    <div class="logo"><h1>Bijli 2.0</h1></div>
   </div>
-  <div style="display:flex;align-items:center;gap:8px">
-    <!-- Desktop Nav -->
-    <div class="nav-wrap" id="desktop-nav">
-      <button class="nav-btn active" data-tab="dashboard" onclick="switchTab('dashboard')"><i class="fa-solid fa-house-chimney"></i> Dashboard</button>
-      <button class="nav-btn" data-tab="upload" onclick="switchTab('upload')"><i class="fa-solid fa-file-arrow-up"></i> Upload Bill</button>
-      <button class="nav-btn" data-tab="analytics" onclick="switchTab('analytics')"><i class="fa-solid fa-chart-mixed"></i> Analytics</button>
-      <button class="nav-btn" data-tab="solar" onclick="switchTab('solar')"><i class="fa-solid fa-sun"></i> Solar</button>
-      <button class="nav-btn" data-tab="history" onclick="switchTab('history')"><i class="fa-solid fa-clock-rotate-left"></i> History</button>
-      <button class="nav-btn" data-tab="settings" onclick="switchTab('settings')"><i class="fa-solid fa-gear"></i> Settings</button>
+  
+  <!-- Multi-Account Switcher -->
+  <select id="acc-select" class="acc-select" onchange="changeAccount(this.value)"></select>
+
+  <div style="display:flex;gap:12px;align-items:center">
+    <div class="nav-wrap">
+      <button class="nav-btn active" onclick="switchTab('dashboard')" data-tab="dashboard">Dashboard</button>
+      <button class="nav-btn" onclick="switchTab('upload')" data-tab="upload">Upload</button>
+      <button class="nav-btn" onclick="switchTab('analytics')" data-tab="analytics">Analytics</button>
+      <button class="nav-btn" onclick="switchTab('history')" data-tab="history">History</button>
+      <button class="nav-btn" onclick="switchTab('settings')" data-tab="settings"><i class="fa-solid fa-gear"></i></button>
     </div>
-    <button class="icon-btn" onclick="toggleDark()" id="theme-btn" title="Toggle dark mode"><i class="fa-solid fa-moon" id="theme-icon"></i></button>
+    <button class="btn-ghost" style="padding:6px 10px" onclick="toggleDark()"><i id="theme-icon" class="fa-solid fa-moon"></i></button>
   </div>
 </header>
 
-<!-- MOBILE BOTTOM NAV -->
-<nav id="bottom-nav">
-  <button class="bottom-nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')"><i class="fa-solid fa-house-chimney"></i><span>Home</span></button>
-  <button class="bottom-nav-item" data-tab="upload" onclick="switchTab('upload')"><i class="fa-solid fa-file-arrow-up"></i><span>Upload</span></button>
-  <button class="bottom-nav-item" data-tab="analytics" onclick="switchTab('analytics')"><i class="fa-solid fa-chart-mixed"></i><span>Charts</span></button>
-  <button class="bottom-nav-item" data-tab="solar" onclick="switchTab('solar')"><i class="fa-solid fa-sun"></i><span>Solar</span></button>
-  <button class="bottom-nav-item" data-tab="history" onclick="switchTab('history')"><i class="fa-solid fa-clock-rotate-left"></i><span>Bills</span></button>
-</nav>
-
-<main>
+<main style="max-width:1100px;margin:0 auto;padding:24px 16px">
 
 <!-- ═══════════════════════════════════════════
-     TAB: DASHBOARD
+     DASHBOARD
 ═══════════════════════════════════════════ -->
 <div id="tab-dashboard" class="tab-content active">
-
-  <!-- Sync Status Banner -->
-  <div id="sync-banner" style="display:none;border-radius:14px;padding:12px 16px;margin-bottom:16px;align-items:center;gap:10px;border:1px solid;font-size:12px;font-weight:700">
-    <i id="sync-icon" class="fa-solid fa-cloud"></i>
-    <span id="sync-msg">Checking sync…</span>
-    <button onclick="gistPull()" style="margin-left:auto;background:transparent;border:1.5px solid currentColor;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:800;cursor:pointer;color:inherit;font-family:'Plus Jakarta Sans',sans-serif">↓ Pull</button>
-    <button onclick="gistPush(true)" style="background:transparent;border:1.5px solid currentColor;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:800;cursor:pointer;color:inherit;font-family:'Plus Jakarta Sans',sans-serif">↑ Push</button>
-  </div>
-
-  <div id="setup-banner" style="display:none">
-    <i class="fa-solid fa-circle-info"></i>
-    <div>
-      <h4>💾 Running in Local Mode — Data saved on this device only</h4>
-      <p>To sync across devices, go to <b>Settings → GitHub Gist Sync</b> and add your GitHub token.<br>
-      Takes 2 minutes — and your data stays in <b>your own GitHub account</b>.</p>
-    </div>
-  </div>
-
-  <!-- Stat Cards -->
   <div class="stat-grid">
     <div class="stat-card sc-sky">
-      <div class="label">This Month Units</div>
-      <div class="value" id="stat-units">—</div>
-      <div class="sub" id="stat-units-sub">kWh consumed</div>
+      <div class="label">Current Month Units</div>
+      <div class="value mono" id="st-units">0</div>
+      <div style="font-size:11px;margin-top:4px;font-weight:600" id="st-units-sub">vs last month</div>
       <div class="icon-bg">⚡</div>
     </div>
     <div class="stat-card sc-volt">
       <div class="label">Bill Amount</div>
-      <div class="value" id="stat-amount">—</div>
-      <div class="sub" id="stat-amount-sub">₹ current bill</div>
+      <div class="value mono" id="st-amt">₹0</div>
+      <div style="font-size:11px;margin-top:4px;font-weight:600" id="st-amt-sub">due</div>
       <div class="icon-bg">💰</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9)">
+      <div class="label">Forecast Next Month</div>
+      <div class="value mono" id="st-forecast">₹0</div>
+      <div style="font-size:11px;margin-top:4px;font-weight:600" id="st-forecast-sub">Estimated</div>
+      <div class="icon-bg">🔮</div>
     </div>
     <div class="stat-card sc-green">
       <div class="label">Solar Saved</div>
-      <div class="value" id="stat-solar">—</div>
-      <div class="sub" id="stat-solar-sub">units net metered</div>
+      <div class="value mono" id="st-solar">0</div>
+      <div style="font-size:11px;margin-top:4px;font-weight:600" id="st-solar-sub">units this month</div>
       <div class="icon-bg">☀️</div>
     </div>
-    <div class="stat-card sc-rose">
-      <div class="label">Bills Logged</div>
-      <div class="value" id="stat-count">0</div>
-      <div class="sub">Total records</div>
-      <div class="icon-bg">📄</div>
-    </div>
   </div>
 
-  <!-- Quick Charts Row -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px" id="dash-charts-wrap">
-    <div class="chart-wrap">
-      <div class="chart-title">📈 Consumption Trend <span class="badge">Last 6 Months</span></div>
-      <canvas id="chart-dash-units"></canvas>
-    </div>
-    <div class="chart-wrap">
-      <div class="chart-title">💸 Bill Amount Trend <span class="badge">₹</span></div>
-      <canvas id="chart-dash-amount"></canvas>
-    </div>
+  <div class="sec-title">Tariff Slab Analyzer & Insights</div>
+  <div class="insight-grid" id="dash-insights">
+    <!-- Generated dynamically -->
   </div>
 
-  <!-- Latest Bill Summary -->
-  <div class="sec-title">Latest Bill Summary</div>
-  <div id="latest-bill-card">
-    <div class="empty-state">
-      <span class="emoji">📄</span>
-      <h3>No bills uploaded yet</h3>
-      <p>Go to <b>Upload Bill</b> tab to add your first bill</p>
-      <br>
-      <button class="btn-primary" onclick="switchTab('upload')"><i class="fa-solid fa-plus"></i> Upload First Bill</button>
-    </div>
-  </div>
-
-  <!-- Insights -->
-  <div class="sec-title" style="margin-top:24px">Smart Insights</div>
-  <div class="insight-grid" id="insights-grid">
-    <div class="insight-card">
-      <div class="insight-icon" style="background:rgba(14,165,233,.1)">📊</div>
-      <div><h4>Upload Bills</h4><p>Upload your SBPDCL bills to see personalised insights about your energy usage patterns.</p></div>
-    </div>
-  </div>
+  <div class="sec-title" style="margin-top:24px">Quick Trend</div>
+  <div class="chart-wrap"><canvas id="chart-quick" style="max-height:220px"></canvas></div>
 </div>
 
 <!-- ═══════════════════════════════════════════
-     TAB: UPLOAD BILL
+     UPLOAD & AI PROCESSING
 ═══════════════════════════════════════════ -->
 <div id="tab-upload" class="tab-content">
-  <div style="max-width:680px;margin:0 auto">
-    <div style="margin-bottom:24px">
-      <h2 style="font-size:1.4rem;font-weight:900;margin-bottom:4px">🤖 Import via AI Assistant</h2>
-      <p style="font-size:13px;color:var(--text-muted);font-weight:600">Use ChatGPT, Gemini, or Claude to extract data from your bill without any API keys.</p>
+  <div style="max-width:700px;margin:0 auto">
+    <div style="text-align:center;margin-bottom:24px">
+      <h2 style="font-size:1.4rem;font-weight:900">Add Electricity Bill</h2>
+      <p style="font-size:12px;color:var(--text-muted);font-weight:600">Select an engine below to process your bill</p>
     </div>
 
-    <!-- AI Workflow Zone -->
-    <div id="ai-workflow" style="display:grid;gap:20px">
-      <div class="card" style="padding:24px;background:rgba(14,165,233,.04);border-color:var(--sky)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <h3 style="font-size:1.1rem;font-weight:800;color:var(--sky)">Step 1: Copy AI Prompt</h3>
-          <button class="btn-primary" onclick="copyPrompt()" style="padding:6px 14px;font-size:11px"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
-        </div>
-        <p style="font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:12px">Go to your favorite AI (ChatGPT, Gemini, Claude). Upload your bill image or PDF, and paste this exact prompt:</p>
-        <textarea id="ai-prompt-text" readonly style="width:100%;height:140px;padding:12px;border-radius:12px;border:1px solid var(--card-border);background:var(--card-bg);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);resize:none;">I am uploading my SBPDCL electricity bill. Please extract the following details and return ONLY a valid JSON object. Do not include any explanations, greetings, or markdown formatting (like ```json).
+    <div style="display:flex;gap:8px;justify-content:center;margin-bottom:20px">
+      <button class="btn-primary" id="btn-mode-ai" onclick="setUploadMode('ai')" style="background:var(--card-bg);color:var(--text);border:1px solid var(--card-border);box-shadow:none">🤖 Groq AI (Smart)</button>
+      <button class="btn-primary" id="btn-mode-local" onclick="setUploadMode('local')" style="background:var(--card-bg);color:var(--text);border:1px solid var(--card-border);box-shadow:none">🔒 Local PDF (Regex)</button>
+      <button class="btn-primary" id="btn-mode-manual" onclick="setUploadMode('manual')" style="background:var(--card-bg);color:var(--text);border:1px solid var(--card-border);box-shadow:none">✍️ Manual AI Paste</button>
+    </div>
 
-Required JSON structure:
-{
-  "bill_month": "e.g. MAY-2026",
-  "account_number": "CA number e.g. 100604522",
-  "consumer_name": "full name",
-  "address": "full address",
-  "consumer_category": "e.g. DS-IID",
-  "meter_phase": "SINGLE PHASE or THREE PHASE",
-  "area_type": "URBAN or RURAL",
-  "sanctioned_load_kw": 0,
-  "recorded_demand_kw": 0,
-  "meter_number": "meter ID",
-  "previous_reading_date": "DD.MM.YY",
-  "current_reading_date": "DD.MM.YY",
-  "previous_reading": 0,
-  "current_reading": 0,
-  "units_consumed_phase1": 0,
-  "units_consumed_phase2": 0,
-  "total_units_consumed": 0,
-  "power_factor": 0.0,
-  "bill_days": 0,
-  "energy_charge": 0,
-  "fixed_charge_demand_charge": 0,
-  "excess_demand_charge": 0,
-  "electricity_duty": 0,
-  "capacitor_charge": 0,
-  "other_charges": 0,
-  "subtotal": 0,
-  "state_subsidy_free_units": 0,
-  "state_subsidy_subsidised_units": 0,
-  "current_bill_amount": 0,
-  "late_payment_surcharge": 0,
-  "remission": 0,
-  "total_demand": 0,
-  "previous_balance": 0,
-  "total_due_by_due_date": 0,
-  "due_date": "DD.MM.YYYY",
-  "solar_current_month_balance": 0,
-  "solar_previous_month_balance": 0,
-  "average_supply_hours": 0,
-  "previous_payment_amount": 0,
-  "previous_payment_date": "DD.MM.YYYY",
-  "notes": "any important observations"
-}</textarea>
+    <div class="card" style="padding:24px" id="upload-zone-wrapper">
+      <!-- File Drop (Used for Groq & Local) -->
+      <div id="file-drop-area">
+        <input type="file" id="file-input" accept="application/pdf,image/*" style="display:none" onchange="handleFileSelect(event)">
+        <label for="file-input" class="drop-zone" id="drop-zone">
+          <i class="fa-solid fa-cloud-arrow-up" style="font-size:2.5rem;color:var(--sky);margin-bottom:12px"></i>
+          <h3 style="font-size:1.1rem;font-weight:800;margin-bottom:4px">Click or Drag Bill Here</h3>
+          <p style="font-size:12px;color:var(--text-muted);font-weight:600" id="upload-hint">PDF or Image</p>
+        </label>
+        
+        <div id="processing-state" style="display:none;text-align:center;padding:30px 0">
+          <i class="fa-solid fa-spinner fa-spin" style="font-size:2rem;color:var(--sky);margin-bottom:12px"></i>
+          <h4 style="font-weight:800;font-size:14px" id="proc-title">Analysing...</h4>
+          <p style="font-size:12px;color:var(--text-muted)" id="proc-sub">Please wait</p>
+        </div>
       </div>
 
-      <div class="card" style="padding:24px">
-        <h3 style="font-size:1.1rem;font-weight:800;margin-bottom:12px">Step 2: Paste AI Response</h3>
-        <p style="font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:12px">Paste the JSON response generated by the AI here:</p>
-        <textarea id="ai-response-input" placeholder="Paste the { JSON } data here..." style="width:100%;height:160px;padding:12px;border-radius:12px;border:1.5px solid var(--card-border);background:var(--slate50);font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);margin-bottom:12px;outline:none;resize:y"></textarea>
-        <button class="btn-primary" onclick="processAIResponse()" style="width:100%;justify-content:center;padding:12px"><i class="fa-solid fa-wand-magic-sparkles"></i> Process Bill Data</button>
+      <!-- Manual Prompt Area -->
+      <div id="manual-prompt-area" style="display:none">
+        <p style="font-size:12px;font-weight:600;margin-bottom:8px">Paste this prompt into ChatGPT/Gemini:</p>
+        <textarea readonly style="width:100%;height:100px;font-size:10px;margin-bottom:12px;font-family:monospace" class="mono" onclick="this.select()">Extract SBPDCL bill to ONLY valid JSON: { "bill_month": "MAY-2026", "account_number": "123", "total_units_consumed": 0, "fixed_charge_demand_charge": 0, "energy_charge": 0, "state_subsidy_free_units": 0, "current_bill_amount": 0, "solar_current_month_balance": 0, "power_factor": 0.95, "current_reading": 0, "previous_reading": 0 }</textarea>
+        <p style="font-size:12px;font-weight:600;margin-bottom:8px">Paste JSON Response here:</p>
+        <textarea id="manual-json-input" style="width:100%;height:140px;font-family:monospace;font-size:11px" placeholder="{ ... }"></textarea>
+        <button class="btn-primary" style="width:100%;margin-top:12px;justify-content:center" onclick="processManualJSON()">Process JSON</button>
       </div>
     </div>
 
-    <!-- Preview & Confirm -->
-    <div id="bill-preview" style="display:none" class="card" style="padding:24px">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--card-border);display:flex;align-items:center;justify-content:space-between">
-        <div>
-          <h3 style="font-weight:800;margin-bottom:2px">✅ Bill Extracted</h3>
-          <p style="font-size:12px;color:var(--text-muted);font-weight:600">Review and confirm the data before saving</p>
-        </div>
-        <button class="btn-ghost" onclick="resetUpload()" style="font-size:12px">✕ Cancel</button>
+    <!-- Preview Results -->
+    <div id="bill-preview" style="display:none;margin-top:20px" class="card">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--card-border);background:rgba(16,185,129,.05)">
+        <h3 style="font-weight:800;color:var(--emerald)"><i class="fa-solid fa-check"></i> Bill Extracted successfully</h3>
       </div>
-      <div style="padding:20px 24px">
-        <div id="preview-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
-        <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">
-          <button class="btn-ghost" onclick="editExtracted()"><i class="fa-solid fa-pen"></i> Edit</button>
-          <button class="btn-primary" onclick="saveBill()"><i class="fa-solid fa-floppy-disk"></i> Save Bill</button>
-        </div>
+      <div style="padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:12px" id="preview-grid"></div>
+      <div style="padding:16px 20px;border-top:1px solid var(--card-border);display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn-ghost" onclick="resetUpload()">Cancel</button>
+        <button class="btn-primary" onclick="saveExtractedBill()"><i class="fa-solid fa-floppy-disk"></i> Save Bill</button>
       </div>
-    </div>
-
-    <!-- Manual Entry -->
-    <div style="margin-top:20px;text-align:center">
-      <span style="font-size:12px;color:var(--text-muted);font-weight:600">or </span>
-      <button class="btn-ghost" onclick="openManualEntry()" style="font-size:12px"><i class="fa-solid fa-keyboard"></i> Enter Manually</button>
     </div>
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
-     TAB: ANALYTICS
+     ANALYTICS
 ═══════════════════════════════════════════ -->
 <div id="tab-analytics" class="tab-content">
-  <h2 style="font-size:1.4rem;font-weight:900;margin-bottom:20px">📊 Analytics</h2>
-
-  <!-- Period selector -->
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
-    <button class="pill pill-sky period-btn active" data-months="6" onclick="setPeriod(6)">Last 6 Months</button>
-    <button class="pill period-btn" data-months="12" onclick="setPeriod(12)">12 Months</button>
-    <button class="pill period-btn" data-months="24" onclick="setPeriod(24)">All Time</button>
-  </div>
-
   <div style="display:grid;gap:16px">
-    <!-- Units consumption -->
-    <div class="chart-wrap">
-      <div class="chart-title">⚡ Monthly Unit Consumption (kWh) <span class="badge">All Phases</span></div>
-      <canvas id="chart-units" style="max-height:280px"></canvas>
-    </div>
-
-    <!-- Bill amount -->
-    <div class="chart-wrap">
-      <div class="chart-title">💸 Monthly Bill Amount (₹)</div>
-      <canvas id="chart-amounts" style="max-height:240px"></canvas>
-    </div>
-
+    
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <!-- Charge breakdown (latest) -->
       <div class="chart-wrap">
-        <div class="chart-title">🧾 Charge Breakdown <span class="badge">Latest Bill</span></div>
-        <canvas id="chart-breakdown" style="max-height:240px"></canvas>
+        <div class="chart-title">📊 YoY Consumption (Current vs Prev Year)</div>
+        <canvas id="chart-yoy" style="max-height:260px"></canvas>
       </div>
-      <!-- Solar vs Grid -->
       <div class="chart-wrap">
-        <div class="chart-title">☀️ Solar vs Grid Units <span class="badge">6 Mo</span></div>
-        <canvas id="chart-solar-vs-grid" style="max-height:240px"></canvas>
+        <div class="chart-title">💸 Cost Breakdown Trend</div>
+        <canvas id="chart-cost-stack" style="max-height:260px"></canvas>
       </div>
     </div>
 
-    <!-- Power factor trend -->
     <div class="chart-wrap">
-      <div class="chart-title">⚙️ Power Factor Trend <span class="badge">Target ≥ 0.95</span></div>
-      <canvas id="chart-pf" style="max-height:200px"></canvas>
+      <div class="chart-title">📈 Absolute Meter Readings <span style="font-size:10px;font-weight:600;color:var(--text-muted)">(Consumption & Solar)</span></div>
+      <canvas id="chart-readings" style="max-height:220px"></canvas>
     </div>
+
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
-     TAB: SOLAR
-═══════════════════════════════════════════ -->
-<div id="tab-solar" class="tab-content">
-  <h2 style="font-size:1.4rem;font-weight:900;margin-bottom:20px">☀️ Solar Energy Tracker</h2>
-
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:24px" class="solar-stat-grid">
-    <div class="stat-card sc-volt" style="padding:16px">
-      <div class="label">Current Balance</div>
-      <div class="value" id="sol-cur-bal">—</div>
-      <div class="sub">Units banked</div>
-      <div class="icon-bg">☀️</div>
-    </div>
-    <div class="stat-card sc-green" style="padding:16px">
-      <div class="label">Cumul. Saved</div>
-      <div class="value" id="sol-total-saved">—</div>
-      <div class="sub">₹ lifetime savings</div>
-      <div class="icon-bg">💚</div>
-    </div>
-    <div class="stat-card sc-sky" style="padding:16px">
-      <div class="label">Best Month</div>
-      <div class="value" id="sol-best">—</div>
-      <div class="sub">Peak generation</div>
-      <div class="icon-bg">🏆</div>
-    </div>
-  </div>
-
-  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start">
-    <div class="chart-wrap">
-      <div class="chart-title">☀️ Solar Balance Trend <span class="badge">kWh</span></div>
-      <canvas id="chart-solar-trend" style="max-height:260px"></canvas>
-    </div>
-    <div class="card" style="padding:24px;text-align:center">
-      <div class="chart-title" style="justify-content:center">Current Month</div>
-      <div class="solar-arc" id="solar-gauge-wrap">
-        <div class="solar-fill" id="solar-gauge-fill"></div>
-        <div class="solar-center">
-          <div class="big" id="solar-gauge-val">—</div>
-          <div class="sml">units</div>
-        </div>
-      </div>
-      <p style="font-size:11px;color:var(--text-muted);font-weight:600;margin-top:8px" id="solar-gauge-sub">Upload bills to see solar data</p>
-    </div>
-  </div>
-
-  <!-- Solar insights -->
-  <div class="sec-title" style="margin-top:24px">Solar Insights</div>
-  <div class="insight-grid" id="solar-insights"></div>
-</div>
-
-<!-- ═══════════════════════════════════════════
-     TAB: HISTORY
+     HISTORY
 ═══════════════════════════════════════════ -->
 <div id="tab-history" class="tab-content">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
-    <h2 style="font-size:1.4rem;font-weight:900">📋 Bill History</h2>
-    <div style="display:flex;gap:8px">
-      <button class="btn-ghost" onclick="exportCSV()"><i class="fa-solid fa-download"></i> Export CSV</button>
-      <button class="btn-primary" onclick="switchTab('upload')"><i class="fa-solid fa-plus"></i> Add Bill</button>
-    </div>
-  </div>
-
-  <div class="card" style="overflow:hidden">
-    <div style="overflow-x:auto">
-      <table class="bill-table" id="history-table">
-        <thead>
-          <tr>
-            <th>Month</th>
-            <th>Units (kWh)</th>
-            <th>Fixed Charge</th>
-            <th>Energy Charge</th>
-            <th>Subsidy</th>
-            <th>Net Amount</th>
-            <th>Solar Balance</th>
-            <th>Power Factor</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="history-tbody">
-          <tr><td colspan="9"><div class="empty-state" style="padding:32px"><span class="emoji">📭</span><h3>No bills saved</h3><p>Upload your first bill to start tracking</p></div></td></tr>
-        </tbody>
-      </table>
-    </div>
+  <div class="card" style="overflow-x:auto">
+    <table class="bill-table">
+      <thead>
+        <tr>
+          <th>Account</th>
+          <th>Month</th>
+          <th>Units</th>
+          <th>Reading</th>
+          <th>Net Amt</th>
+          <th>Solar</th>
+          <th>PF</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="history-body"></tbody>
+    </table>
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
-     TAB: SETTINGS
+     SETTINGS
 ═══════════════════════════════════════════ -->
 <div id="tab-settings" class="tab-content">
-  <h2 style="font-size:1.4rem;font-weight:900;margin-bottom:24px">⚙️ Settings</h2>
-
-  <!-- Consumer Info -->
-  <div class="sec-title">Consumer Information</div>
-  <div class="card" style="padding:20px 24px;margin-bottom:20px">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="field"><label>Consumer Name</label><input type="text" id="set-name" placeholder="SMT. KANTI KUMARI"></div>
-      <div class="field"><label>Account Number (CA)</label><input type="text" id="set-ca" placeholder="100604522"></div>
-      <div class="field"><label>Address</label><input type="text" id="set-addr" placeholder="KANKARBAGH, PATNA"></div>
-      <div class="field"><label>Category</label><input type="text" id="set-cat" placeholder="DS-IID"></div>
-      <div class="field"><label>Sanctioned Load (KW)</label><input type="number" id="set-load" placeholder="11" step="0.1"></div>
-      <div class="field"><label>Per Unit Rate (₹)</label><input type="number" id="set-rate" placeholder="7.30" step="0.01"></div>
-    </div>
-    <button class="btn-primary" onclick="saveSettings()" style="margin-top:8px"><i class="fa-solid fa-floppy-disk"></i> Save</button>
-  </div>
-
-  <!-- GitHub Gist Sync Config -->
-  <div class="sec-title">GitHub Gist Sync</div>
-  <div class="card" style="padding:20px 24px;margin-bottom:20px">
-    <div style="padding:12px 14px;border-radius:12px;background:rgba(14,165,233,.06);border:1px solid rgba(14,165,233,.18);margin-bottom:16px">
-      <p style="font-size:12px;font-weight:700;line-height:1.8;color:var(--sky)">
-        <b>How to get your GitHub Token (2 min):</b><br>
-        1. Go to <b>github.com → Settings → Developer Settings → Personal Access Tokens → Tokens (classic)</b><br>
-        2. Click <b>Generate new token (classic)</b><br>
-        3. Give it a name (e.g. "Bijli Tracker"), check only the <b><code>gist</code></b> scope<br>
-        4. Click Generate → Copy the token below<br>
-        5. Leave Gist ID blank on first save — app will create a private Gist automatically ✅
-      </p>
-    </div>
-    <div style="display:grid;gap:10px">
-      <div class="field"><label>GitHub Personal Access Token</label>
-        <input type="password" id="set-gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
-      </div>
-      <div class="field"><label>Gist ID <span style="font-weight:600;text-transform:none;font-size:10px">(leave blank to auto-create on first sync)</span></label>
-        <input type="text" id="set-gist-id" placeholder="Will be filled automatically after first sync">
+  <div style="max-width:600px;margin:0 auto">
+    
+    <div class="sec-title">Accounts Management</div>
+    <div class="card" style="padding:20px;margin-bottom:20px">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Manage multiple properties/meters.</p>
+      <div id="accounts-list" style="margin-bottom:12px;display:grid;gap:8px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="new-acc-ca" placeholder="CA Number" style="flex:1" class="field" style="margin:0">
+        <input type="text" id="new-acc-name" placeholder="Alias (e.g. Home)" style="flex:1" class="field" style="margin:0">
+        <button class="btn-primary" onclick="addAccount()">Add</button>
       </div>
     </div>
-    <div id="gist-status" style="display:none;margin-top:10px;padding:10px 12px;border-radius:10px;font-size:12px;font-weight:700"></div>
-    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-      <button class="btn-primary" onclick="saveGistConfig()"><i class="fa-brands fa-github"></i> Save & Test</button>
-      <button class="btn-ghost" onclick="gistPush(true)"><i class="fa-solid fa-cloud-arrow-up"></i> Push Now</button>
-      <button class="btn-ghost" onclick="gistPull()"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Now</button>
-    </div>
-    <p style="margin-top:10px;font-size:11px;color:var(--text-muted);font-weight:600">🔒 Token is stored only in your browser's localStorage — never sent anywhere except GitHub's API.</p>
-  </div>
 
-  <!-- Preferences -->
-  <div class="sec-title">Preferences</div>
-  <div class="card" style="padding:8px 24px;margin-bottom:20px">
-    <div class="settings-row">
-      <div><h4>Dark Mode</h4><p>Switch between light and dark theme</p></div>
-      <div class="right"><label class="toggle"><input type="checkbox" id="tog-dark" onchange="toggleDark()"><div class="toggle-slider"></div></label></div>
+    <div class="sec-title">AI & Extraction (BYOK)</div>
+    <div class="card" style="padding:20px;margin-bottom:20px;border-color:var(--rose-d)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <i class="fa-solid fa-brain" style="color:var(--rose)"></i>
+        <h4 style="font-weight:800">Groq API Key (Optional)</h4>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">Add a free Groq API key to enable lightning-fast auto-extraction of PDFs and Images. Without it, the app falls back to local PDF Regex parsing.</p>
+      <div class="field">
+        <input type="password" id="set-groq" placeholder="gsk_xxxxxxxxxxxxxxxxxxxxx">
+      </div>
+      <button class="btn-ghost" onclick="saveSettings()">Save Key</button>
     </div>
-    <div class="settings-row">
-      <div><h4>Show Solar Data</h4><p>Display solar net metering columns</p></div>
-      <div class="right"><label class="toggle"><input type="checkbox" id="tog-solar" checked><div class="toggle-slider"></div></label></div>
-    </div>
-    <div class="settings-row">
-      <div><h4>Per Unit Rate (₹)</h4><p>Used for savings calculations</p></div>
-      <div class="right"><input type="number" id="tog-rate" value="7.30" step="0.01" style="width:80px;padding:6px 10px;border-radius:8px;border:1.5px solid var(--card-border);background:var(--slate50);color:var(--text);font-weight:700;font-family:'JetBrains Mono',monospace;outline:none"></div>
-    </div>
-  </div>
 
-  <!-- Data Management -->
-  <div class="sec-title">Data Management</div>
-  <div class="card" style="padding:20px 24px">
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn-primary" onclick="exportJSON()"><i class="fa-solid fa-download"></i> Backup (JSON)</button>
-      <label class="btn-ghost" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:800">
-        <i class="fa-solid fa-upload"></i> Restore (JSON)
-        <input type="file" accept=".json" style="display:none" onchange="importJSON(this)">
-      </label>
-      <button class="btn-ghost" onclick="clearAllData()" style="color:var(--rose)"><i class="fa-solid fa-trash"></i> Clear All Data</button>
+    <div class="sec-title">Tariff Configuration</div>
+    <div class="card" style="padding:20px">
+      <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">Used for the Slab Analyzer. (Default SBPDCL Domestic ~₹6.10 / ₹6.95)</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Slab 1 Limit (Units)</label><input type="number" id="set-slab1" value="100"></div>
+        <div class="field"><label>Slab 1 Rate (₹)</label><input type="number" id="set-rate1" value="6.10" step="0.01"></div>
+        <div class="field"><label>Slab 2 Rate (₹)</label><input type="number" id="set-rate2" value="6.95" step="0.01"></div>
+        <div class="field"><label>Fixed Charge (₹/kW)</label><input type="number" id="set-fixed" value="40"></div>
+      </div>
+      <button class="btn-primary" onclick="saveSettings()" style="margin-top:10px">Save Settings</button>
     </div>
+
   </div>
 </div>
+
 </main>
 
-<!-- MANUAL ENTRY MODAL -->
-<div id="manual-modal" class="modal-overlay" style="display:none">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h3>✍️ Manual Bill Entry</h3>
-      <button class="icon-btn" onclick="closeModal('manual-modal')"><i class="fa-solid fa-times"></i></button>
-    </div>
-    <div class="modal-body">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="field"><label>Bill Month (MM-YYYY)</label><input type="text" id="m-month" placeholder="MAY-2026"></div>
-        <div class="field"><label>Total Units (kWh)</label><input type="number" id="m-units" placeholder="1088"></div>
-        <div class="field"><label>Fixed / Demand Charge (₹)</label><input type="number" id="m-fixed" placeholder="720"></div>
-        <div class="field"><label>Energy Charge (₹)</label><input type="number" id="m-energy" placeholder="0"></div>
-        <div class="field"><label>State Subsidy (₹)</label><input type="number" id="m-subsidy" placeholder="720"></div>
-        <div class="field"><label>Net Bill Amount (₹)</label><input type="number" id="m-net" placeholder="0"></div>
-        <div class="field"><label>Previous Balance (₹)</label><input type="number" id="m-prev-bal" placeholder="0"></div>
-        <div class="field"><label>Total Due (₹)</label><input type="number" id="m-total-due" placeholder="0"></div>
-        <div class="field"><label>Solar Balance (Units)</label><input type="number" id="m-solar" placeholder="520"></div>
-        <div class="field"><label>Power Factor</label><input type="number" id="m-pf" placeholder="0.94" step="0.01" max="1"></div>
-        <div class="field"><label>Previous Reading</label><input type="number" id="m-prev-read" placeholder="14861"></div>
-        <div class="field"><label>Current Reading</label><input type="number" id="m-cur-read" placeholder="15848"></div>
-      </div>
-      <div class="field" style="margin-top:4px"><label>Notes (optional)</label><input type="text" id="m-notes" placeholder="e.g. Zero bill — solar surplus month"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-ghost" onclick="closeModal('manual-modal')">Cancel</button>
-      <button class="btn-primary" onclick="saveManualEntry()"><i class="fa-solid fa-floppy-disk"></i> Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- BILL DETAIL MODAL -->
-<div id="detail-modal" class="modal-overlay" style="display:none">
-  <div class="modal-box" style="max-width:600px">
-    <div class="modal-header">
-      <h3 id="detail-title">Bill Detail</h3>
-      <button class="icon-btn" onclick="closeModal('detail-modal')"><i class="fa-solid fa-times"></i></button>
-    </div>
-    <div class="modal-body" id="detail-body"></div>
-    <div class="modal-footer">
-      <button class="btn-ghost" onclick="closeModal('detail-modal')">Close</button>
-    </div>
-  </div>
-</div>
-
 <script>
-// ════════════════════════════════════════════════════
-//  STATE
-// ════════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════
+   STATE & INITIALIZATION
+════════════════════════════════════════════════════ */
 let bills = [];
-let settings = {};
-let chartInstances = {};
-let extractedData = null;
-let analyticsPeriod = 6;
-let darkMode = false;
+let settings = {
+  accounts: [],
+  groqKey: '',
+  slab1: 100, rate1: 6.10, rate2: 6.95, fixed: 40,
+  dark: false
+};
+let currentAcc = 'ALL';
+let uploadMode = 'local';
+let extractedTemp = null;
+let charts = {};
 
-const STORAGE_KEY = 'bijliTracker_v2';
-const SETTINGS_KEY = 'bijliSettings_v2';
-
-// ════════════════════════════════════════════════════
-//  INIT
-// ════════════════════════════════════════════════════
 function init() {
-  loadLocal();
-  applyDark();
-  renderDashboard();
-  renderHistory();
-  renderAnalytics();
-  renderSolar();
-  loadSettingsUI();
-  // Try to pull from Gist on startup if configured
-  const token = localStorage.getItem('gh_token');
-  const gistId = localStorage.getItem('gh_gist_id');
-  if (token && gistId) {
-    gistPull(true); // silent pull on startup
-  } else {
-    document.getElementById('setup-banner').style.display = 'flex';
-  }
-}
+  const b = localStorage.getItem('bt_bills');
+  if (b) bills = JSON.parse(b);
+  const s = localStorage.getItem('bt_settings');
+  if (s) settings = { ...settings, ...JSON.parse(s) };
 
-// ════════════════════════════════════════════════════
-//  GITHUB GIST SYNC
-// ════════════════════════════════════════════════════
-const GIST_FILENAME = 'bijli_tracker_data.json';
+  // Auto-infer accounts if missing
+  const uniqueCAs = [...new Set(bills.map(x => x.account_number).filter(Boolean))];
+  uniqueCAs.forEach(ca => {
+    if(!settings.accounts.find(a => a.ca === ca)) settings.accounts.push({ca, name: `Meter ${ca.slice(-4)}`});
+  });
 
-function getGistCreds() {
-  return {
-    token: localStorage.getItem('gh_token') || '',
-    gistId: localStorage.getItem('gh_gist_id') || ''
-  };
-}
+  if(settings.dark) { document.documentElement.classList.add('dark'); document.getElementById('theme-icon').className = 'fa-solid fa-sun'; }
+  if(settings.groqKey) uploadMode = 'ai';
 
-function setSyncBanner(state, msg) {
-  const banner = document.getElementById('sync-banner');
-  const icon   = document.getElementById('sync-icon');
-  const msgEl  = document.getElementById('sync-msg');
-  if (!banner) return;
-  const styles = {
-    syncing:  { bg:'rgba(14,165,233,.08)',  border:'rgba(14,165,233,.25)',  color:'var(--sky)',     iconClass:'fa-solid fa-rotate fa-spin' },
-    ok:       { bg:'rgba(16,185,129,.08)',  border:'rgba(16,185,129,.25)',  color:'var(--emerald)', iconClass:'fa-solid fa-cloud-check' },
-    error:    { bg:'rgba(244,63,94,.08)',   border:'rgba(244,63,94,.25)',   color:'var(--rose)',    iconClass:'fa-solid fa-cloud-exclamation' },
-    offline:  { bg:'rgba(234,179,8,.08)',   border:'rgba(234,179,8,.25)',   color:'#a16207',        iconClass:'fa-solid fa-cloud-slash' },
-  };
-  const s = styles[state] || styles.offline;
-  banner.style.display = 'flex';
-  banner.style.background  = s.bg;
-  banner.style.borderColor = s.border;
-  banner.style.color       = s.color;
-  icon.className = s.iconClass;
-  msgEl.textContent = msg;
-}
-
-// Push local data → Gist (creates Gist if no ID yet)
-async function gistPush(showToastOnOk = false) {
-  const { token, gistId } = getGistCreds();
-  if (!token) { setSyncBanner('offline', 'GitHub token not set — go to Settings'); return; }
-
-  setSyncBanner('syncing', 'Pushing to GitHub Gist…');
-  const payload = JSON.stringify({ bills, settings, updated: new Date().toISOString() }, null, 2);
-
-  try {
-    let response, data;
-    if (gistId) {
-      // Update existing Gist
-      response = await fetch(`https://api.github.com/gists/${gistId}`, {
-        method: 'PATCH',
-        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ files: { [GIST_FILENAME]: { content: payload } } })
-      });
-    } else {
-      // Create new private Gist
-      response = await fetch('[https://api.github.com/gists](https://api.github.com/gists)', {
-        method: 'POST',
-        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: 'Bijli Tracker — SBPDCL Bill Data',
-          public: false,
-          files: { [GIST_FILENAME]: { content: payload } }
-        })
-      });
-    }
-
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.message || `HTTP ${response.status}`);
-    }
-
-    data = await response.json();
-
-    // Save the Gist ID if newly created
-    if (!gistId && data.id) {
-      localStorage.setItem('gh_gist_id', data.id);
-      // Also update the Settings field
-      const el = document.getElementById('set-gist-id');
-      if (el) el.value = data.id;
-      showGistStatus(`✅ Private Gist created! ID: ${data.id}`, 'green');
-    }
-
-    const now = new Date().toLocaleTimeString();
-    setSyncBanner('ok', `Synced to GitHub Gist · ${now}`);
-    if (showToastOnOk) toast('☁️ Pushed to GitHub Gist');
-  } catch(e) {
-    setSyncBanner('error', `Sync failed: ${e.message}`);
-    if (showToastOnOk) toast('❌ Gist push failed: ' + e.message, 'error');
-    console.error('Gist push error:', e);
-  }
-}
-
-// Pull data ← Gist → overwrite local
-async function gistPull(silent = false) {
-  const { token, gistId } = getGistCreds();
-  if (!token || !gistId) {
-    if (!silent) toast('❌ Configure GitHub token + Gist ID in Settings first', 'error');
-    return;
-  }
-
-  if (!silent) setSyncBanner('syncing', 'Pulling from GitHub Gist…');
-
-  try {
-    const response = await fetch(`https://api.github.com/gists/${gistId}`, {
-      headers: { 'Authorization': `token ${token}` }
-    });
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    const file = data.files?.[GIST_FILENAME];
-    if (!file?.content) throw new Error('Data file not found in Gist');
-
-    const parsed = JSON.parse(file.content);
-    if (parsed.bills) bills = parsed.bills;
-    if (parsed.settings) settings = parsed.settings;
-    saveLocalOnly(); // save to localStorage without re-pushing
-    applyDark();
-    renderDashboard(); renderHistory(); renderAnalytics(); renderSolar(); loadSettingsUI();
-
-    const now = new Date().toLocaleTimeString();
-    setSyncBanner('ok', `Pulled from GitHub Gist · ${now}`);
-    if (!silent) toast('☁️ Pulled from GitHub Gist');
-  } catch(e) {
-    setSyncBanner('error', `Pull failed: ${e.message}`);
-    if (!silent) toast('❌ Gist pull failed: ' + e.message, 'error');
-    console.error('Gist pull error:', e);
-  }
-}
-
-function showGistStatus(msg, color = 'green') {
-  const el = document.getElementById('gist-status');
-  if (!el) return;
-  el.style.display = 'block';
-  el.style.background = color === 'green' ? 'rgba(16,185,129,.1)' : 'rgba(244,63,94,.1)';
-  el.style.border = `1px solid rgba(${color==='green'?'16,185,129':'244,63,94'},.25)`;
-  el.style.color = color === 'green' ? 'var(--emerald)' : 'var(--rose)';
-  el.textContent = msg;
-}
-
-async function saveGistConfig() {
-  const token  = document.getElementById('set-gh-token').value.trim();
-  const gistId = document.getElementById('set-gist-id').value.trim();
-  if (!token) { showGistStatus('❌ Please enter your GitHub token', 'red'); return; }
-  if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
-    showGistStatus('⚠️ Token should start with ghp_ or github_pat_', 'red'); return;
-  }
-  // Test token validity
-  showGistStatus('Testing token…', 'green');
-  try {
-    const r = await fetch('[https://api.github.com/user](https://api.github.com/user)', { headers: { 'Authorization': `token ${token}` } });
-    if (!r.ok) throw new Error('Invalid token');
-    const user = await r.json();
-    localStorage.setItem('gh_token', token);
-    if (gistId) localStorage.setItem('gh_gist_id', gistId);
-    showGistStatus(`✅ Connected as @${user.login}! ${gistId ? 'Gist ID saved.' : 'No Gist ID — will auto-create on first push.'}`, 'green');
-    document.getElementById('setup-banner').style.display = 'none';
-    toast(`✅ Connected as @${user.login}`);
-    // Push immediately if we have bills
-    if (bills.length > 0) setTimeout(() => gistPush(true), 500);
-  } catch(e) {
-    showGistStatus('❌ Token invalid or no gist permission. Check the token.', 'red');
-  }
-}
-
-// ════════════════════════════════════════════════════
-//  LOCAL STORAGE
-// ════════════════════════════════════════════════════
-function loadLocal() {
-  try {
-    const d = localStorage.getItem(STORAGE_KEY);
-    if (d) bills = JSON.parse(d);
-    const s = localStorage.getItem(SETTINGS_KEY);
-    if (s) settings = JSON.parse(s);
-    if (settings.dark) { darkMode = true; document.documentElement.classList.add('dark'); }
-  } catch(e) {}
-}
-
-function saveLocalOnly() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(bills));
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  updateAccSwitcher();
+  setUploadMode(uploadMode);
+  renderAll();
+  
+  // Fill settings UI
+  document.getElementById('set-groq').value = settings.groqKey || '';
+  ['slab1','rate1','rate2','fixed'].forEach(k => document.getElementById('set-'+k).value = settings[k]);
+  renderSettingsAccounts();
 }
 
 function saveLocal() {
-  saveLocalOnly();
-  gistPush(false); // auto-push to Gist silently
+  localStorage.setItem('bt_bills', JSON.stringify(bills));
+  localStorage.setItem('bt_settings', JSON.stringify(settings));
 }
 
-// ════════════════════════════════════════════════════
-//  ROUTING
-// ════════════════════════════════════════════════════
-function switchTab(id) {
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-  document.getElementById('tab-' + id).classList.add('active');
-  document.querySelectorAll('[data-tab]').forEach(b => {
-    b.classList.toggle('active', b.dataset.tab === id);
-  });
-  if (id === 'analytics') setTimeout(renderAnalytics, 50);
-  if (id === 'solar') setTimeout(renderSolar, 50);
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-
-// ════════════════════════════════════════════════════
-//  DARK MODE
-// ════════════════════════════════════════════════════
-function applyDark() {
-  document.documentElement.classList.toggle('dark', darkMode);
-  document.getElementById('theme-icon').className = darkMode ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
-  const tog = document.getElementById('tog-dark');
-  if (tog) tog.checked = darkMode;
-}
-function toggleDark() {
-  darkMode = !darkMode;
-  settings.dark = darkMode;
-  applyDark();
-  saveLocal();
-  setTimeout(() => { renderAnalytics(); renderSolar(); }, 100);
-}
-
-// ════════════════════════════════════════════════════
-//  AI WORKFLOW (MANUAL COPY-PASTE)
-// ════════════════════════════════════════════════════
-function copyPrompt() {
-  const promptText = document.getElementById('ai-prompt-text');
-  promptText.select();
-  promptText.setSelectionRange(0, 99999); // For mobile devices
-  try {
-    document.execCommand('copy');
-    toast('✅ Prompt copied to clipboard!');
-  } catch(err) {
-    toast('❌ Failed to copy. Please copy manually.', 'error');
-  }
-  window.getSelection().removeAllRanges();
-}
-
-function processAIResponse() {
-  const inputEl = document.getElementById('ai-response-input');
-  const rawText = inputEl.value.trim();
-
-  if (!rawText) {
-    toast('❌ Please paste the AI response first.', 'error');
-    return;
-  }
-
-  try {
-    let parsedData = null;
-    
-    // 1. Try direct parsing (if AI responded with pure JSON)
-    try {
-      parsedData = JSON.parse(rawText);
-    } catch (e) {
-      // 2. Try extracting from markdown fences (e.g., ```json ... ```)
-      // We use `{3}` instead of literal backticks to prevent breaking the Markdown parser!
-      const match = rawText.match(/`{3}(?:json)?\s*([\s\S]*?)\s*`{3}/);
-      if (match) {
-        try { parsedData = JSON.parse(match[1].trim()); } catch (err) {}
-      }
-      
-      // 3. Last resort: find first { and last }
-      if (!parsedData) {
-        const firstBrace = rawText.indexOf('{');
-        const lastBrace = rawText.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace !== -1) {
-          try { parsedData = JSON.parse(rawText.substring(firstBrace, lastBrace + 1)); } catch (err) {}
-        }
-      }
-    }
-
-    if (!parsedData || typeof parsedData !== 'object') {
-       throw new Error("Could not find valid JSON in the pasted text. Ensure you pasted the exact AI response.");
-    }
-
-    // Validation successful, show preview
-    extractedData = parsedData;
-    document.getElementById('ai-workflow').style.display = 'none';
-    showPreview(parsedData);
-    
-  } catch (err) {
-    toast('❌ ' + err.message, 'error');
-    console.error(err);
-  }
-}
-
-// ════════════════════════════════════════════════════
-//  PREVIEW EXTRACTED DATA
-// ════════════════════════════════════════════════════
-const FIELD_LABELS = {
-  bill_month: 'Bill Month', account_number: 'Account (CA)', consumer_name: 'Consumer Name',
-  consumer_category: 'Category', total_units_consumed: 'Total Units (kWh)',
-  fixed_charge_demand_charge: 'Fixed/Demand Charge (₹)', energy_charge: 'Energy Charge (₹)',
-  state_subsidy_free_units: 'Subsidy — Free Units (₹)', state_subsidy_subsidised_units: 'Subsidy — Subsidised (₹)',
-  current_bill_amount: 'Current Bill (₹)', total_due_by_due_date: 'Total Due (₹)',
-  due_date: 'Due Date', solar_current_month_balance: 'Solar Balance (Units)',
-  power_factor: 'Power Factor', previous_payment_amount: 'Previous Payment (₹)',
-};
-
-function showPreview(data) {
-  const preview = document.getElementById('bill-preview');
-  preview.style.display = 'block';
-
-  const fields = document.getElementById('preview-fields');
-  fields.innerHTML = Object.entries(FIELD_LABELS).map(([k, label]) => {
-    const val = data[k];
-    return `<div style="padding:10px 12px;background:var(--slate50);border-radius:10px;border:1px solid var(--card-border)">
-      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:3px">${label}</div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--text)">${val ?? '—'}</div>
-    </div>`;
-  }).join('');
-}
-
-// ════════════════════════════════════════════════════
-//  SAVE BILL
-// ════════════════════════════════════════════════════
-function saveBill() {
-  if (!extractedData) return;
-  const bill = {
-    ...extractedData,
-    id: Date.now(),
-    saved_at: new Date().toISOString(),
-    source: 'ai'
-  };
-  // Deduplicate by bill_month
-  const idx = bills.findIndex(b => b.bill_month === bill.bill_month);
-  if (idx > -1) {
-    if (!confirm(`A bill for ${bill.bill_month} already exists. Replace it?`)) return;
-    bills[idx] = bill;
-  } else {
-    bills.push(bill);
-  }
-  bills.sort((a, b) => sortMonth(a.bill_month) - sortMonth(b.bill_month));
-  saveLocal();
-  resetUpload();
-  toast('✅ Bill saved!');
-  renderDashboard(); renderHistory(); renderAnalytics(); renderSolar();
-  switchTab('dashboard');
+function getActiveBills() {
+  let active = currentAcc === 'ALL' ? bills : bills.filter(b => b.account_number === currentAcc);
+  return active.sort((a,b) => sortMonth(a.bill_month) - sortMonth(b.bill_month));
 }
 
 function sortMonth(m) {
-  if (!m) return 0;
-  const months = {JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
-  const parts = m.split('-');
-  const yr = parseInt(parts[1] || '2026');
-  const mo = months[parts[0]?.toUpperCase()] || 0;
-  return yr * 100 + mo;
+  if(!m) return 0;
+  const mos = {JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
+  const [mo, yr] = m.split('-');
+  return (parseInt(yr||2026)*100) + (mos[mo?.toUpperCase()]||0);
 }
 
-function resetUpload() {
-  extractedData = null;
-  document.getElementById('ai-workflow').style.display = 'grid';
-  document.getElementById('bill-preview').style.display = 'none';
-  const inputEl = document.getElementById('ai-response-input');
-  if (inputEl) inputEl.value = '';
+// UI Nav
+function switchTab(t) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
+  document.getElementById('tab-'+t).classList.add('active');
+  if(t==='dashboard' || t==='analytics') setTimeout(renderAll, 50);
+}
+function toggleDark() {
+  settings.dark = !settings.dark;
+  document.documentElement.classList.toggle('dark', settings.dark);
+  document.getElementById('theme-icon').className = settings.dark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+  saveLocal(); renderAll();
+}
+function toast(msg, isErr=false) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.style.background = isErr ? 'var(--rose-d)' : (settings.dark ? 'var(--slate800)' : 'var(--slate900)');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// ════════════════════════════════════════════════════
-//  MANUAL ENTRY
-// ════════════════════════════════════════════════════
-function openManualEntry() { document.getElementById('manual-modal').style.display = 'flex'; }
+/* ════════════════════════════════════════════════════
+   MULTI-ACCOUNT LOGIC
+════════════════════════════════════════════════════ */
+function updateAccSwitcher() {
+  const sel = document.getElementById('acc-select');
+  sel.innerHTML = `<option value="ALL">All Meters (${bills.length} bills)</option>` + 
+    settings.accounts.map(a => `<option value="${a.ca}">${a.name} (${a.ca})</option>`).join('');
+  sel.value = currentAcc;
+}
+function changeAccount(ca) { currentAcc = ca; renderAll(); }
+function addAccount() {
+  const ca = document.getElementById('new-acc-ca').value.trim();
+  const name = document.getElementById('new-acc-name').value.trim();
+  if(!ca) return toast('CA required', true);
+  if(!settings.accounts.find(a=>a.ca===ca)) settings.accounts.push({ca, name: name||'Meter'});
+  saveLocal(); updateAccSwitcher(); renderSettingsAccounts();
+  document.getElementById('new-acc-ca').value=''; document.getElementById('new-acc-name').value='';
+}
+function delAccount(ca) {
+  settings.accounts = settings.accounts.filter(a => a.ca !== ca);
+  if(currentAcc === ca) { currentAcc = 'ALL'; updateAccSwitcher(); }
+  saveLocal(); renderSettingsAccounts(); updateAccSwitcher();
+}
+function renderSettingsAccounts() {
+  document.getElementById('accounts-list').innerHTML = settings.accounts.map(a => 
+    `<div style="display:flex;justify-content:space-between;padding:10px;background:var(--slate50);border-radius:8px;border:1px solid var(--card-border);font-size:12px;font-weight:700">
+      <span>${a.name} <span style="color:var(--text-muted);font-weight:500">(${a.ca})</span></span>
+      <button onclick="delAccount('${a.ca}')" style="background:none;border:none;color:var(--rose);cursor:pointer"><i class="fa-solid fa-trash"></i></button>
+    </div>`
+  ).join('');
+}
+function saveSettings() {
+  settings.groqKey = document.getElementById('set-groq').value.trim();
+  ['slab1','rate1','rate2','fixed'].forEach(k => settings[k] = parseFloat(document.getElementById('set-'+k).value)||0);
+  saveLocal(); toast('Settings saved');
+}
 
-function saveManualEntry() {
-  const bill = {
-    id: Date.now(),
-    saved_at: new Date().toISOString(),
-    source: 'manual',
-    bill_month: document.getElementById('m-month').value.trim().toUpperCase(),
-    total_units_consumed: parseFloat(document.getElementById('m-units').value) || 0,
-    fixed_charge_demand_charge: parseFloat(document.getElementById('m-fixed').value) || 0,
-    energy_charge: parseFloat(document.getElementById('m-energy').value) || 0,
-    state_subsidy_free_units: parseFloat(document.getElementById('m-subsidy').value) || 0,
-    current_bill_amount: parseFloat(document.getElementById('m-net').value) || 0,
-    previous_balance: parseFloat(document.getElementById('m-prev-bal').value) || 0,
-    total_due_by_due_date: parseFloat(document.getElementById('m-total-due').value) || 0,
-    solar_current_month_balance: parseFloat(document.getElementById('m-solar').value) || 0,
-    power_factor: parseFloat(document.getElementById('m-pf').value) || 0,
-    previous_reading: parseFloat(document.getElementById('m-prev-read').value) || 0,
-    current_reading: parseFloat(document.getElementById('m-cur-read').value) || 0,
-    notes: document.getElementById('m-notes').value.trim(),
+/* ════════════════════════════════════════════════════
+   UPLOAD & PARSING LOGIC
+════════════════════════════════════════════════════ */
+function setUploadMode(mode) {
+  uploadMode = mode;
+  document.querySelectorAll('#btn-mode-ai, #btn-mode-local, #btn-mode-manual').forEach(b => {
+    b.style.background = 'var(--card-bg)'; b.style.color = 'var(--text)'; b.style.borderColor = 'var(--card-border)';
+  });
+  const activeBtn = document.getElementById('btn-mode-'+mode);
+  activeBtn.style.background = 'var(--sky)'; activeBtn.style.color = '#fff'; activeBtn.style.borderColor = 'var(--sky)';
+
+  document.getElementById('file-drop-area').style.display = (mode==='ai'||mode==='local') ? 'block' : 'none';
+  document.getElementById('manual-prompt-area').style.display = (mode==='manual') ? 'block' : 'none';
+  document.getElementById('upload-hint').textContent = mode==='ai' ? 'PDF or Image (Requires Groq Key)' : 'PDF Only (Local Text Regex)';
+}
+
+// Drag & Drop bindings
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+function handleFileSelect(e) { handleFile(e.target.files[0]); }
+
+async function handleFile(file) {
+  if(!file) return;
+  document.getElementById('drop-zone').style.display = 'none';
+  const proc = document.getElementById('processing-state');
+  proc.style.display = 'block';
+
+  try {
+    let resultJSON = null;
+    if(uploadMode === 'local') {
+      if(file.type !== 'application/pdf') throw new Error('Local mode requires PDF.');
+      document.getElementById('proc-title').textContent = 'Extracting PDF Text Locally...';
+      const text = await extractPDFText(file);
+      resultJSON = parseRegex(text);
+    } 
+    else if(uploadMode === 'ai') {
+      if(!settings.groqKey) throw new Error('Please set Groq API Key in Settings first.');
+      if(file.type === 'application/pdf') {
+        document.getElementById('proc-title').textContent = 'Extracting Text for Groq...';
+        const text = await extractPDFText(file);
+        document.getElementById('proc-title').textContent = 'Asking Groq (Llama 3.3)...';
+        resultJSON = await callGroqText(text);
+      } else {
+        document.getElementById('proc-title').textContent = 'Asking Groq Vision...';
+        const b64 = await fileToBase64(file);
+        resultJSON = await callGroqVision(b64);
+      }
+    }
+    
+    if(!resultJSON.bill_month || !resultJSON.account_number) throw new Error('Could not reliably extract Month and CA Number.');
+    extractedTemp = resultJSON;
+    showPreview(resultJSON);
+  } catch(e) {
+    toast(e.message, true);
+    resetUpload();
+  }
+}
+
+// 1. Local PDF Extraction (pdf.js)
+async function extractPDFText(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+  let fullText = '';
+  for(let i=1; i<=pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const textContent = await page.getTextContent();
+    fullText += textContent.items.map(s => s.str).join(' ') + '\n';
+  }
+  return fullText;
+}
+
+// 2. Regex Fallback Parser
+function parseRegex(text) {
+  const d = { 
+    account_number: (text.match(/CA Number\s*[:\-]?\s*(\d+)/i) || [])[1],
+    bill_month: (text.match(/(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*-\s*20\d{2}/i) || [])[0],
+    total_units_consumed: parseFloat((text.match(/Total Units\s*[:\-]?\s*(\d+(\.\d+)?)/i) || [])[1]) || 0,
+    current_bill_amount: parseFloat((text.match(/Current Bill Amount\s*[:\-]?\s*(\d+(\.\d+)?)/i) || [])[1]) || 0,
+    power_factor: parseFloat((text.match(/Power Factor\s*[:\-]?\s*(0\.\d+)/i) || [])[1]) || 1,
+    current_reading: parseFloat((text.match(/Current Reading\s*[:\-]?\s*(\d+(\.\d+)?)/i) || [])[1]) || 0,
+    solar_current_month_balance: parseFloat((text.match(/Solar.*Balance\s*[:\-]?\s*(\d+)/i) || [])[1]) || 0
   };
-  if (!bill.bill_month) { toast('❌ Enter bill month', 'error'); return; }
-  const idx = bills.findIndex(b => b.bill_month === bill.bill_month);
-  if (idx > -1) {
-    if (!confirm(`Replace existing ${bill.bill_month} bill?`)) return;
-    bills[idx] = bill;
-  } else { bills.push(bill); }
-  bills.sort((a,b) => sortMonth(a.bill_month) - sortMonth(b.bill_month));
-  saveLocal();
-  closeModal('manual-modal');
-  toast('✅ Bill saved!');
-  renderDashboard(); renderHistory(); renderAnalytics(); renderSolar();
+  if(d.bill_month) d.bill_month = d.bill_month.toUpperCase();
+  return d;
+}
+
+// 3. Groq Prompts & Calls
+const GROQ_SYS_PROMPT = `Extract SBPDCL electricity bill data into strict JSON format. 
+Required keys: bill_month (e.g. MAY-2026), account_number, total_units_consumed (number), fixed_charge_demand_charge (number), energy_charge (number), state_subsidy_free_units (number), current_bill_amount (number), power_factor (number), current_reading (number), previous_reading (number), solar_current_month_balance (number). Return ONLY valid JSON object.`;
+
+async function callGroqText(text) {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${settings.groqKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{role: 'system', content: GROQ_SYS_PROMPT}, {role: 'user', content: `Bill Text:\n${text.substring(0, 4000)}`}],
+      response_format: { type: 'json_object' }
+    })
+  });
+  if(!res.ok) throw new Error('Groq API Error: ' + res.status);
+  const data = await res.json();
+  return JSON.parse(data.choices[0].message.content);
+}
+
+async function callGroqVision(b64) {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${settings.groqKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'llama-3.2-11b-vision-preview',
+      messages: [{ role: 'user', content: [{type:'text', text: GROQ_SYS_PROMPT}, {type:'image_url', image_url:{url: b64}}] }]
+    })
+  });
+  if(!res.ok) throw new Error('Groq Vision Error: ' + res.status);
+  const data = await res.json();
+  // Vision models sometimes ignore json_object formatting, so extract via regex
+  const text = data.choices[0].message.content;
+  const match = text.match(/\{[\s\S]*\}/);
+  return JSON.parse(match ? match[0] : '{}');
+}
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => res(reader.result);
+    reader.onerror = error => rej(error);
+  });
+}
+
+// 4. Manual JSON Paste
+function processManualJSON() {
+  try {
+    const txt = document.getElementById('manual-json-input').value;
+    const match = txt.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(match ? match[0] : '{}');
+    if(!parsed.bill_month) throw new Error('Invalid JSON missing bill_month');
+    extractedTemp = parsed;
+    showPreview(parsed);
+  } catch(e) { toast('Invalid JSON', true); }
+}
+
+function showPreview(d) {
+  document.getElementById('upload-zone-wrapper').style.display = 'none';
+  document.getElementById('processing-state').style.display = 'none';
+  document.getElementById('bill-preview').style.display = 'block';
+  const grid = document.getElementById('preview-grid');
+  grid.innerHTML = Object.entries(d).filter(([k,v])=>v!==null&&v!==undefined).map(([k,v]) => 
+    `<div><div style="font-size:9px;font-weight:800;color:var(--text-muted);text-transform:uppercase">${k.replace(/_/g,' ')}</div><div class="mono" style="font-size:12px;font-weight:700">${v}</div></div>`
+  ).join('');
+}
+function resetUpload() {
+  extractedTemp = null;
+  document.getElementById('upload-zone-wrapper').style.display = 'block';
+  document.getElementById('bill-preview').style.display = 'none';
+  document.getElementById('drop-zone').style.display = 'block';
+  document.getElementById('processing-state').style.display = 'none';
+  document.getElementById('manual-json-input').value = '';
+}
+function saveExtractedBill() {
+  if(!extractedTemp) return;
+  // auto-assign CA if not present
+  if(!extractedTemp.account_number && currentAcc !== 'ALL') extractedTemp.account_number = currentAcc;
+  const idx = bills.findIndex(b => b.bill_month === extractedTemp.bill_month && b.account_number === extractedTemp.account_number);
+  if(idx > -1) bills[idx] = extractedTemp; else bills.push(extractedTemp);
+  
+  // Create account if new
+  if(extractedTemp.account_number && !settings.accounts.find(a=>a.ca===extractedTemp.account_number)) {
+    settings.accounts.push({ca: extractedTemp.account_number, name: `New (${extractedTemp.account_number.slice(-4)})`});
+    updateAccSwitcher();
+  }
+  
+  saveLocal(); toast('Bill Saved!'); resetUpload();
   switchTab('dashboard');
 }
 
-function editExtracted() {
-  // populate manual modal with extracted data
-  if (!extractedData) return;
-  const d = extractedData;
-  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-  set('m-month', d.bill_month);
-  set('m-units', d.total_units_consumed);
-  set('m-fixed', d.fixed_charge_demand_charge);
-  set('m-energy', d.energy_charge);
-  set('m-subsidy', d.state_subsidy_free_units);
-  set('m-net', d.current_bill_amount);
-  set('m-prev-bal', d.previous_balance);
-  set('m-total-due', d.total_due_by_due_date);
-  set('m-solar', d.solar_current_month_balance);
-  set('m-pf', d.power_factor);
-  set('m-prev-read', d.previous_reading);
-  set('m-cur-read', d.current_reading);
-  openManualEntry();
+/* ════════════════════════════════════════════════════
+   DASHBOARD & ANALYTICS RENDERING
+════════════════════════════════════════════════════ */
+function renderAll() {
+  const active = getActiveBills();
+  renderDashboard(active);
+  renderHistory(active);
+  renderCharts(active);
 }
 
-// ════════════════════════════════════════════════════
-//  DASHBOARD RENDER
-// ════════════════════════════════════════════════════
-function renderDashboard() {
-  const latest = bills[bills.length - 1];
-  const prev   = bills[bills.length - 2];
-
-  // Stat cards
-  if (latest) {
-    const units = latest.total_units_consumed || 0;
-    const prevUnits = prev?.total_units_consumed || 0;
-    const unitDiff = prevUnits ? ((units - prevUnits) / prevUnits * 100).toFixed(1) : null;
-    const unitArrow = unitDiff > 0 ? '↑' : '↓';
-
-    document.getElementById('stat-units').textContent = units;
-    document.getElementById('stat-units-sub').textContent = unitDiff ? `${unitArrow}${Math.abs(unitDiff)}% vs last month` : 'kWh consumed';
-
-    const amt = latest.total_due_by_due_date || latest.current_bill_amount || 0;
-    document.getElementById('stat-amount').textContent = amt < 0 ? `-₹${Math.abs(amt)}` : `₹${amt}`;
-    document.getElementById('stat-amount-sub').textContent = amt <= 0 ? '🎉 Zero / Credit Bill' : `Due: ${latest.due_date || '—'}`;
-
-    const solar = latest.solar_current_month_balance || 0;
-    const rate = parseFloat(document.getElementById('tog-rate')?.value || settings.rate || 7.3);
-    const solarSavings = (solar * rate).toFixed(0);
-    document.getElementById('stat-solar').textContent = solar;
-    document.getElementById('stat-solar-sub').textContent = `₹${solarSavings} saved this month`;
-  }
-  document.getElementById('stat-count').textContent = bills.length;
-
-  // Latest bill card
-  renderLatestBillCard(latest);
-
-  // Quick charts
-  renderMiniChart();
-
-  // Insights
-  renderInsights();
-}
-
-function renderLatestBillCard(b) {
-  const el = document.getElementById('latest-bill-card');
-  if (!b) { el.innerHTML = `<div class="empty-state"><span class="emoji">📄</span><h3>No bills uploaded yet</h3><p>Go to <b>Upload Bill</b> tab</p><br><button class="btn-primary" onclick="switchTab('upload')"><i class="fa-solid fa-plus"></i> Upload First Bill</button></div>`; return; }
-
-  const rate = parseFloat(settings.rate || 7.3);
-  const netAmt = b.total_due_by_due_date ?? b.current_bill_amount ?? 0;
-  const amtColor = netAmt <= 0 ? 'var(--emerald)' : netAmt > 2000 ? 'var(--rose)' : 'var(--sky)';
-  const amtLabel = netAmt <= 0 ? '🎉 Zero/Credit Bill' : `₹${netAmt} Due`;
-
-  el.innerHTML = `<div class="card" style="overflow:hidden">
-    <div style="background:linear-gradient(135deg,#0ea5e9,#6366f1);padding:18px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <div>
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;opacity:.8;color:#fff;margin-bottom:4px">Latest Bill</div>
-        <div style="font-size:1.5rem;font-weight:900;color:#fff;font-family:'Syne',sans-serif">${b.bill_month || 'Unknown'}</div>
-        <div style="font-size:11px;font-weight:600;opacity:.8;color:#fff;margin-top:2px">${b.consumer_name || settings.name || 'Consumer'} · CA: ${b.account_number || settings.ca || '—'}</div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:700;color:#fff">${amtLabel}</div>
-        <div style="font-size:11px;opacity:.8;color:#fff;margin-top:2px">${b.total_units_consumed || 0} kWh · PF: ${b.power_factor || '—'}</div>
-      </div>
-    </div>
-    <div style="padding:20px 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px">
-      ${[
-        ['Energy Charge', `₹${b.energy_charge||0}`, '#0ea5e9'],
-        ['Fixed/Demand', `₹${b.fixed_charge_demand_charge||0}`, '#6366f1'],
-        ['Subsidy', `-₹${Math.abs(b.state_subsidy_free_units||0)+Math.abs(b.state_subsidy_subsidised_units||0)}`, '#10b981'],
-        ['Solar Balance', `${b.solar_current_month_balance||0} Units`, '#eab308'],
-        ['Power Factor', b.power_factor||'—', b.power_factor >= 0.95 ? '#10b981' : '#f43f5e'],
-        ['Prev Payment', `₹${b.previous_payment_amount||0}`, '#8b5cf6'],
-      ].map(([label, val, color]) => `
-        <div style="text-align:center">
-          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:4px">${label}</div>
-          <div style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:1rem;color:${color}">${val}</div>
-        </div>`).join('')}
-    </div>
-    ${b.notes ? `<div style="padding:10px 24px 16px"><div style="padding:10px 14px;background:rgba(14,165,233,.06);border-radius:10px;border:1px solid rgba(14,165,233,.15);font-size:12px;font-weight:600;color:var(--sky)">📝 ${b.notes}</div></div>` : ''}
-  </div>`;
-}
-
-function renderMiniChart() {
-  if (bills.length < 2) return;
-  const last6 = bills.slice(-6);
-  const labels = last6.map(b => b.bill_month?.slice(0,3) || '?');
-  const units  = last6.map(b => b.total_units_consumed || 0);
-  const amounts = last6.map(b => Math.abs(b.total_due_by_due_date ?? b.current_bill_amount ?? 0));
-
-  drawChart('chart-dash-units', 'bar', labels, [{
-    data: units, label: 'kWh',
-    backgroundColor: labels.map((_,i) => i === labels.length-1 ? '#0ea5e9' : 'rgba(14,165,233,.35)'),
-    borderRadius: 8, borderSkipped: false,
-  }], { y: { beginAtZero: true } });
-
-  drawChart('chart-dash-amount', 'line', labels, [{
-    data: amounts, label: '₹',
-    borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,.1)',
-    fill: true, tension: 0.4, pointBackgroundColor: '#f43f5e',
-    pointRadius: 4,
-  }], { y: { beginAtZero: true } });
-}
-
-// ════════════════════════════════════════════════════
-//  ANALYTICS RENDER
-// ════════════════════════════════════════════════════
-function setPeriod(n) {
-  analyticsPeriod = n;
-  document.querySelectorAll('.period-btn').forEach(b => {
-    b.classList.toggle('active', parseInt(b.dataset.months) === n);
-    b.classList.toggle('pill-sky', parseInt(b.dataset.months) === n);
-  });
-  renderAnalytics();
-}
-
-function renderAnalytics() {
-  if (bills.length === 0) return;
-  const data = bills.slice(-analyticsPeriod);
-  const labels = data.map(b => b.bill_month?.slice(0,3)+' '+b.bill_month?.slice(-2) || '?');
-  const units  = data.map(b => b.total_units_consumed || 0);
-  const amounts = data.map(b => Math.abs(b.total_due_by_due_date ?? b.current_bill_amount ?? 0));
-  const pf     = data.map(b => b.power_factor || null);
-  const solar  = data.map(b => b.solar_current_month_balance || 0);
-  const grid   = data.map((b,i) => Math.max(0, units[i] - solar[i]));
-
-  // Units chart
-  drawChart('chart-units', 'bar', labels, [{
-    label: 'kWh', data: units,
-    backgroundColor: 'rgba(14,165,233,.7)', borderRadius: 7, borderSkipped: false,
-  }], { y: { beginAtZero: true, title: { display: true, text: 'kWh', color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } });
-
-  // Amount chart
-  drawChart('chart-amounts', 'line', labels, [{
-    label: '₹ Bill', data: amounts,
-    borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,.08)',
-    fill: true, tension: 0.4, pointRadius: 5, pointHoverRadius: 7,
-    pointBackgroundColor: '#f43f5e', borderWidth: 2,
-  }]);
-
-  // Breakdown pie (latest)
-  const latest = bills[bills.length - 1];
-  if (latest) {
-    const energy = Math.abs(latest.energy_charge || 0);
-    const fixed  = Math.abs(latest.fixed_charge_demand_charge || 0);
-    const sub    = Math.abs(latest.state_subsidy_free_units || 0) + Math.abs(latest.state_subsidy_subsidised_units || 0);
-    const other  = Math.abs(latest.other_charges || 0) + Math.abs(latest.electricity_duty || 0);
-    drawChart('chart-breakdown', 'doughnut', ['Energy','Fixed/Demand','Subsidy','Other'], [{
-      data: [energy, fixed, sub, other],
-      backgroundColor: ['#0ea5e9','#6366f1','#10b981','#f59e0b'],
-      borderWidth: 0, hoverOffset: 8,
-    }], {}, { plugins: { legend: { position: 'bottom', labels: { color: darkMode ? '#94a3b8' : '#475569', font: { size: 11, weight: '700' } } } } });
-  }
-
-  // Solar vs Grid stacked
-  drawChart('chart-solar-vs-grid', 'bar', labels, [
-    { label: 'Grid (kWh)', data: grid, backgroundColor: 'rgba(99,102,241,.7)', borderRadius: 6, borderSkipped: false },
-    { label: 'Solar (kWh)', data: solar, backgroundColor: 'rgba(234,179,8,.8)', borderRadius: 6, borderSkipped: false },
-  ], { y: { beginAtZero: true, stacked: true }, x: { stacked: true } });
-
-  // Power factor line
-  drawChart('chart-pf', 'line', labels, [
-    { label: 'Power Factor', data: pf, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,.08)',
-      fill: true, tension: 0.4, pointRadius: 5, pointBackgroundColor: pf.map(v => v >= 0.95 ? '#10b981' : '#f43f5e') },
-    { label: 'Target (0.95)', data: labels.map(() => 0.95), borderColor: 'rgba(16,185,129,.5)',
-      borderDash: [6,3], borderWidth: 2, pointRadius: 0, fill: false },
-  ], { y: { min: 0.7, max: 1.0 } });
-}
-
-// ════════════════════════════════════════════════════
-//  SOLAR RENDER
-// ════════════════════════════════════════════════════
-function renderSolar() {
-  if (bills.length === 0) {
-    document.getElementById('solar-insights').innerHTML = `<div class="empty-state" style="padding:24px"><span class="emoji">☀️</span><h3>No solar data yet</h3><p>Upload bills with solar net metering data</p></div>`;
-    return;
-  }
-  const latest = bills[bills.length - 1];
-  const rate = parseFloat(document.getElementById('tog-rate')?.value || settings.rate || 7.3);
-
-  // Stats
-  const curBal = latest.solar_current_month_balance || 0;
-  document.getElementById('sol-cur-bal').textContent = curBal;
-  document.getElementById('solar-gauge-val').textContent = curBal;
-
-  // Cumulative savings (estimate: each month's solar saved ≈ prev_month_solar_balance × rate)
-  const totalSolarUnits = bills.reduce((s,b) => s + (b.solar_current_month_balance || 0), 0);
-  document.getElementById('sol-total-saved').textContent = '₹' + Math.round(totalSolarUnits * rate * 0.5);
-
-  const bestSolar = Math.max(...bills.map(b => b.solar_current_month_balance || 0));
-  document.getElementById('sol-best').textContent = bestSolar + ' u';
-
-  // Gauge (semi-circle) — scale 0 to max solar seen
-  const maxSolar = Math.max(bestSolar, 1);
-  const pct = Math.min(1, curBal / maxSolar);
-  const angle = pct * 180 - 180; // -180 to 0 degrees
-  document.getElementById('solar-gauge-fill').style.transform = `rotate(${angle}deg)`;
-  document.getElementById('solar-gauge-sub').textContent = `${((curBal/maxSolar)*100).toFixed(0)}% of peak ${maxSolar} units`;
-
-  // Solar trend chart
-  const last12 = bills.slice(-12);
-  const labels = last12.map(b => b.bill_month?.slice(0,3) || '?');
-  const solData = last12.map(b => b.solar_current_month_balance || 0);
-  drawChart('chart-solar-trend', 'bar', labels, [{
-    label: 'Solar Balance (Units)', data: solData,
-    backgroundColor: solData.map((v,i) => i === solData.length-1 ? '#eab308' : 'rgba(234,179,8,.5)'),
-    borderRadius: 8, borderSkipped: false,
-  }], { y: { beginAtZero: true } });
-
-  // Solar insights
-  const zeroMonths = bills.filter(b => (b.solar_current_month_balance || 0) === 0).length;
-  const highMonths = bills.filter(b => (b.solar_current_month_balance || 0) > 500).length;
-  const avgSolar = totalSolarUnits / (bills.length || 1);
-
-  document.getElementById('solar-insights').innerHTML = [
-    { icon:'⚡', color:'rgba(234,179,8,.1)', title:`Avg Monthly Balance: ${avgSolar.toFixed(0)} Units`, desc:`Estimated savings: ₹${(avgSolar * rate * 0.5).toFixed(0)}/month` },
-    { icon:'🏆', color:'rgba(16,185,129,.1)', title:`Peak Month: ${bestSolar} Units`, desc:`Your best solar generation month so far` },
-    { icon:'📅', color:'rgba(14,165,233,.1)', title:`${highMonths} High-Solar Months (>500u)`, desc:`Months with significant solar surplus` },
-    { icon:'💡', color:'rgba(139,92,246,.1)', title:`${bills.length - zeroMonths}/${bills.length} Months with Solar`, desc:`Solar contributing to ${((bills.length-zeroMonths)/bills.length*100).toFixed(0)}% of billed months` },
-    { icon:'🌡️', color:'rgba(244,63,94,.1)', title:`${zeroMonths} Zero-Solar Months`, desc:`Likely winter / overcast months` },
-    { icon:'💰', color:'rgba(16,185,129,.1)', title:`Lifetime Est. Saving: ₹${Math.round(totalSolarUnits * rate * 0.5)}`, desc:`Based on ₹${rate}/unit × 50% utilisation estimate` },
-  ].map(i => `<div class="insight-card">
-    <div class="insight-icon" style="background:${i.color}">${i.icon}</div>
-    <div><h4>${i.title}</h4><p>${i.desc}</p></div>
-  </div>`).join('');
-}
-
-// ════════════════════════════════════════════════════
-//  HISTORY RENDER
-// ════════════════════════════════════════════════════
-function renderHistory() {
-  const tbody = document.getElementById('history-tbody');
-  if (bills.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state" style="padding:32px"><span class="emoji">📭</span><h3>No bills saved</h3><p>Upload your first bill</p></div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = [...bills].reverse().map(b => {
-    const amt = b.total_due_by_due_date ?? b.current_bill_amount ?? 0;
-    const amtColor = amt <= 0 ? 'var(--emerald)' : amt > 2000 ? 'var(--rose)' : 'inherit';
-    const pfOk = b.power_factor >= 0.95;
-    return `<tr>
-      <td><b>${b.bill_month||'—'}</b><br><span style="font-size:10px;color:var(--text-muted)">${b.source==='manual'?'Manual':'AI'}</span></td>
-      <td class="mono">${b.total_units_consumed||0}</td>
-      <td class="mono">₹${b.fixed_charge_demand_charge||0}</td>
-      <td class="mono">₹${b.energy_charge||0}</td>
-      <td class="mono" style="color:var(--emerald)">-₹${Math.abs(b.state_subsidy_free_units||0)+Math.abs(b.state_subsidy_subsidised_units||0)}</td>
-      <td class="mono" style="color:${amtColor};font-weight:800">${amt<=0?`-₹${Math.abs(amt)}`:`₹${amt}`}</td>
-      <td class="mono">${b.solar_current_month_balance||0} u</td>
-      <td><span class="pill ${pfOk?'pill-green':'pill-red'}">${b.power_factor||'—'}</span></td>
-      <td style="display:flex;gap:6px;align-items:center">
-        <button onclick="showDetail(${b.id})" class="btn-ghost" style="font-size:11px;padding:5px 10px"><i class="fa-solid fa-eye"></i></button>
-        <button onclick="deleteBill(${b.id})" class="btn-ghost" style="font-size:11px;padding:5px 10px;color:var(--rose)"><i class="fa-solid fa-trash"></i></button>
-      </td>
-    </tr>`;
-  }).join('');
-}
-
-// ════════════════════════════════════════════════════
-//  INSIGHTS
-// ════════════════════════════════════════════════════
-function renderInsights() {
-  if (bills.length < 2) {
-    document.getElementById('insights-grid').innerHTML = `<div class="insight-card"><div class="insight-icon" style="background:rgba(14,165,233,.1)">📊</div><div><h4>Upload More Bills</h4><p>Add at least 2 months of bills to see trends and insights.</p></div></div>`;
-    return;
-  }
-  const latest = bills[bills.length - 1];
-  const prev   = bills[bills.length - 2];
-  const allUnits = bills.map(b => b.total_units_consumed || 0);
-  const avgUnits = (allUnits.reduce((a,b) => a+b, 0) / allUnits.length).toFixed(0);
-  const maxBill  = bills.reduce((m,b) => (b.total_units_consumed||0) > (m.total_units_consumed||0) ? b : m, bills[0]);
-  const minBill  = bills.reduce((m,b) => (b.total_units_consumed||0) < (m.total_units_consumed||0) ? b : m, bills[0]);
-  const unitDiff = ((latest.total_units_consumed||0) - (prev.total_units_consumed||0));
-  const rate = parseFloat(settings.rate || 7.3);
-  const zeroCount = bills.filter(b => (b.total_due_by_due_date||b.current_bill_amount||0) <= 0).length;
-
-  const insights = [
-    { icon:'📉', bg:'rgba(14,165,233,.1)', title: unitDiff > 0 ? `↑ ${unitDiff} kWh more vs last month` : `↓ ${Math.abs(unitDiff)} kWh less vs last month`, desc:`Current: ${latest.total_units_consumed||0} kWh vs prev: ${prev.total_units_consumed||0} kWh` },
-    { icon:'📊', bg:'rgba(99,102,241,.1)', title:`Avg Consumption: ${avgUnits} kWh/month`, desc:`Over ${bills.length} months of data` },
-    { icon:'🔥', bg:'rgba(244,63,94,.1)', title:`Peak Month: ${maxBill.bill_month} (${maxBill.total_units_consumed} kWh)`, desc:`Highest consumption month on record` },
-    { icon:'❄️', bg:'rgba(16,185,129,.1)', title:`Lowest Month: ${minBill.bill_month} (${minBill.total_units_consumed} kWh)`, desc:`Best performing month` },
-    { icon:'🎉', bg:'rgba(234,179,8,.1)', title:`${zeroCount} Zero-Bill Months`, desc:`Solar surplus covered your entire bill ${zeroCount} time(s)` },
-    { icon:'⚙️', bg:`rgba(${latest.power_factor>=.95?'16,185,129':'244,63,94'},.1)`, title:`Power Factor: ${latest.power_factor||'—'} ${latest.power_factor>=.95?'✅':'⚠️'}`, desc: latest.power_factor >= 0.95 ? 'Great! PF ≥ 0.95 avoids penalties.' : 'PF < 0.95 may attract penalty charges.' },
-  ];
-
-  document.getElementById('insights-grid').innerHTML = insights.map(i =>
-    `<div class="insight-card"><div class="insight-icon" style="background:${i.bg}">${i.icon}</div><div><h4>${i.title}</h4><p>${i.desc}</p></div></div>`
-  ).join('');
-}
-
-// ════════════════════════════════════════════════════
-//  BILL DETAIL MODAL
-// ════════════════════════════════════════════════════
-function showDetail(id) {
-  const b = bills.find(x => x.id === id);
-  if (!b) return;
-  document.getElementById('detail-title').textContent = `📄 Bill — ${b.bill_month}`;
-  const rows = Object.entries(b).filter(([k]) => !['id','saved_at','source'].includes(k));
-  document.getElementById('detail-body').innerHTML = `<div style="display:grid;gap:8px">` +
-    rows.map(([k,v]) => {
-      if (v === 0 || v === '' || v === null) return '';
-      return `<div style="display:flex;justify-content:space-between;padding:9px 12px;background:var(--slate50);border-radius:10px;border:1px solid var(--card-border)">
-        <span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">${k.replace(/_/g,' ')}</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700">${v}</span>
-      </div>`;
-    }).join('') + `</div>`;
-  document.getElementById('detail-modal').style.display = 'flex';
-}
-
-function deleteBill(id) {
-  if (!confirm('Delete this bill? This cannot be undone.')) return;
-  bills = bills.filter(b => b.id !== id);
-  saveLocal(); renderDashboard(); renderHistory(); renderAnalytics(); renderSolar();
-  toast('🗑️ Bill deleted');
-}
-
-// ════════════════════════════════════════════════════
-//  SETTINGS
-// ════════════════════════════════════════════════════
-function saveSettings() {
-  settings.name = document.getElementById('set-name').value;
-  settings.ca   = document.getElementById('set-ca').value;
-  settings.addr = document.getElementById('set-addr').value;
-  settings.cat  = document.getElementById('set-cat').value;
-  settings.load = document.getElementById('set-load').value;
-  settings.rate = document.getElementById('set-rate').value;
-  saveLocal(); toast('✅ Settings saved'); renderDashboard();
-}
-
-function loadSettingsUI() {
-  const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
-  set('set-name', settings.name); set('set-ca', settings.ca);
-  set('set-addr', settings.addr); set('set-cat', settings.cat);
-  set('set-load', settings.load); set('set-rate', settings.rate);
-  // Gist config
-  const token  = localStorage.getItem('gh_token');
-  const gistId = localStorage.getItem('gh_gist_id');
-  if (token)  set('set-gh-token', token);
-  if (gistId) set('set-gist-id', gistId);
-  if (token)  showGistStatus(`✅ GitHub token loaded. Gist ID: ${gistId || 'Auto-create on first push'}`, 'green');
-}
-
-// ════════════════════════════════════════════════════
-//  EXPORT / IMPORT
-// ════════════════════════════════════════════════════
-function exportJSON() {
-  const blob = new Blob([JSON.stringify({ bills, settings }, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = `bijli_backup_${new Date().toISOString().slice(0,10)}.json`; a.click();
-}
-
-function exportCSV() {
-  if (!bills.length) { toast('No bills to export', 'error'); return; }
-  const cols = ['bill_month','total_units_consumed','fixed_charge_demand_charge','energy_charge',
-    'state_subsidy_free_units','current_bill_amount','total_due_by_due_date',
-    'solar_current_month_balance','power_factor','previous_payment_amount'];
-  const header = cols.join(',');
-  const rows = bills.map(b => cols.map(c => b[c] ?? '').join(','));
-  const blob = new Blob([header+'\n'+rows.join('\n')], { type: 'text/csv' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = `bijli_bills_${new Date().toISOString().slice(0,10)}.csv`; a.click();
-}
-
-function importJSON(inp) {
-  const fr = new FileReader();
-  fr.onload = e => {
-    try {
-      const d = JSON.parse(e.target.result);
-      if (d.bills) bills = d.bills;
-      if (d.settings) settings = d.settings;
-      saveLocal(); init(); toast('✅ Data restored!');
-    } catch { toast('❌ Invalid backup file', 'error'); }
-  };
-  if (inp.files[0]) fr.readAsText(inp.files[0]);
-}
-
-function clearAllData() {
-  if (!confirm('Delete ALL bills and settings? This cannot be undone!')) return;
-  bills = []; settings = {};
-  localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(SETTINGS_KEY);
-  init(); toast('🗑️ All data cleared');
-}
-
-// ════════════════════════════════════════════════════
-//  CHART HELPER
-// ════════════════════════════════════════════════════
-const TEXT_COLOR = () => darkMode ? '#94a3b8' : '#64748b';
-const GRID_COLOR = () => darkMode ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.05)';
-
-function drawChart(canvasId, type, labels, datasets, scalesOverride = {}, extraOptions = {}) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  if (chartInstances[canvasId]) { chartInstances[canvasId].destroy(); }
-  const defaults = {
-    responsive: true,
-    maintainAspectRatio: true,
-    plugins: { legend: { labels: { color: TEXT_COLOR(), font: { size: 11, weight: '700', family: "'Plus Jakarta Sans'" } } }, tooltip: { callbacks: {} } },
-    scales: type === 'doughnut' ? {} : {
-      x: { grid: { color: GRID_COLOR() }, ticks: { color: TEXT_COLOR(), font: { size: 11, weight: '600' } }, border: { display: false }, ...scalesOverride.x },
-      y: { grid: { color: GRID_COLOR() }, ticks: { color: TEXT_COLOR(), font: { size: 11, weight: '600' } }, border: { display: false }, beginAtZero: true, ...scalesOverride.y },
+function renderDashboard(active) {
+  const latest = active[active.length-1];
+  const prev = active[active.length-2];
+  
+  // 1. Basic Stats
+  if(latest) {
+    document.getElementById('st-units').textContent = latest.total_units_consumed||0;
+    document.getElementById('st-amt').textContent = `₹${latest.current_bill_amount||0}`;
+    document.getElementById('st-solar').textContent = latest.solar_current_month_balance||0;
+    
+    if(prev) {
+      const udiff = (latest.total_units_consumed||0) - (prev.total_units_consumed||0);
+      document.getElementById('st-units-sub').textContent = `${udiff>0?'↑':'↓'} ${Math.abs(udiff)} vs last month`;
     }
-  };
-  chartInstances[canvasId] = new Chart(canvas, {
+  } else {
+    ['st-units','st-amt','st-solar'].forEach(id => document.getElementById(id).textContent = '0');
+  }
+
+  // 2. Next Month Forecast
+  if(active.length >= 3) {
+    const last3 = active.slice(-3);
+    const avgU = last3.reduce((s,b)=>s+(b.total_units_consumed||0),0) / 3;
+    const avgA = last3.reduce((s,b)=>s+(b.current_bill_amount||0),0) / 3;
+    
+    // Simple seasonality logic: Check same month last year if available
+    const lastMo = latest.bill_month; // e.g. MAY-2026
+    const [m,y] = lastMo.split('-');
+    const nextMoStr = getNextMonthStr(m) + '-' + (m==='DEC'?parseInt(y)+1:y);
+    const prevYearMo = nextMoStr.split('-')[0] + '-' + (parseInt(nextMoStr.split('-')[1])-1);
+    const histBill = active.find(b => b.bill_month === prevYearMo);
+    
+    const fcstAmt = histBill ? (histBill.current_bill_amount * 1.05) : avgA; // 5% inflation guess
+    document.getElementById('st-forecast').textContent = `₹${Math.round(fcstAmt)}`;
+    document.getElementById('st-forecast-sub').textContent = `For ${nextMoStr}`;
+  } else {
+    document.getElementById('st-forecast').textContent = '—';
+    document.getElementById('st-forecast-sub').textContent = 'Need 3+ bills';
+  }
+
+  // 3. Tariff Slab Analyzer
+  const insightsDiv = document.getElementById('dash-insights');
+  if(!latest) { insightsDiv.innerHTML = '<p style="font-size:12px;color:var(--text-muted)">Upload bills to see insights.</p>'; return; }
+  
+  let insights = [];
+  const u = latest.total_units_consumed||0;
+  const {slab1, rate1, rate2} = settings;
+  
+  if(u > slab1) {
+    const extra = u - slab1;
+    const diff = (rate2 - rate1).toFixed(2);
+    insights.push({i:'⚠️', c:'var(--rose-d)', t:`Slab Exceeded! (> ${slab1} units)`, d:`You used ${extra} units in the expensive tier. Lowering usage below ${slab1} saves ₹${diff}/unit.`});
+  } else {
+    const margin = slab1 - u;
+    insights.push({i:'✅', c:'var(--emerald)', t:`Optimal Slab Range`, d:`You are ${margin} units away from the expensive tier. Keep it up!`});
+  }
+
+  if((latest.power_factor||1) < 0.95) insights.push({i:'⚙️', c:'var(--volt-d)', t:`Poor Power Factor`, d:`PF is ${latest.power_factor}. Getting below 0.90 will attract heavy penalties.`});
+  
+  if(latest.solar_current_month_balance > 0) {
+    const sv = latest.solar_current_month_balance * rate1;
+    insights.push({i:'☀️', c:'var(--sky-d)', t:`Solar Contributor`, d:`Your solar banked units saved you approx ₹${Math.round(sv)} this month.`});
+  }
+
+  insightsDiv.innerHTML = insights.map(x => 
+    `<div class="insight-card"><div class="insight-icon" style="background:${x.c}15;color:${x.c}">${x.i}</div><div><h4 style="font-size:12px;font-weight:800;margin-bottom:2px">${x.t}</h4><p style="font-size:11px;color:var(--text-muted);font-weight:600;line-height:1.4">${x.d}</p></div></div>`
+  ).join('');
+
+  // Quick Trend
+  const labels = active.slice(-6).map(b => b.bill_month.substring(0,3));
+  const data = active.slice(-6).map(b => b.total_units_consumed||0);
+  drawChart('chart-quick', 'line', labels, [{data, borderColor:'#0ea5e9', backgroundColor:'rgba(14,165,233,.1)', fill:true, tension:0.4}], true);
+}
+
+function getNextMonthStr(m) {
+  const arr = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const idx = arr.indexOf(m);
+  return idx === 11 ? 'JAN' : arr[idx+1];
+}
+
+/* ════════════════════════════════════════════════════
+   CHARTS & ANALYTICS
+════════════════════════════════════════════════════ */
+function renderCharts(active) {
+  if(active.length === 0) return;
+
+  // 1. YoY Consumption
+  // Group by month name
+  const yrCur = new Date().getFullYear();
+  const yoyLabels = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  let curData = new Array(12).fill(0), prevData = new Array(12).fill(0);
+  
+  active.forEach(b => {
+    if(!b.bill_month) return;
+    const [m, y] = b.bill_month.split('-');
+    const idx = yoyLabels.indexOf(m);
+    if(idx === -1) return;
+    if(parseInt(y) === yrCur) curData[idx] = b.total_units_consumed;
+    if(parseInt(y) === yrCur-1) prevData[idx] = b.total_units_consumed;
+  });
+
+  drawChart('chart-yoy', 'bar', yoyLabels, [
+    { label: `Year ${yrCur-1}`, data: prevData, backgroundColor: 'rgba(148,163,184,.4)', borderRadius:4 },
+    { label: `Year ${yrCur}`, data: curData, backgroundColor: '#0ea5e9', borderRadius:4 }
+  ]);
+
+  // 2. Cost Stack (Last 12)
+  const last12 = active.slice(-12);
+  const l12Labels = last12.map(b => b.bill_month.substring(0,3));
+  drawChart('chart-cost-stack', 'bar', l12Labels, [
+    { label: 'Energy (₹)', data: last12.map(b=>b.energy_charge||0), backgroundColor: '#3b82f6' },
+    { label: 'Fixed (₹)', data: last12.map(b=>b.fixed_charge_demand_charge||0), backgroundColor: '#8b5cf6' },
+    { label: 'Subsidy (-₹)', data: last12.map(b=>-Math.abs(b.state_subsidy_free_units||0)), backgroundColor: '#10b981' }
+  ], false, { x:{stacked:true}, y:{stacked:true} });
+
+  // 3. Absolute Meter Readings Line Chart
+  const readLabels = last12.map(b => b.bill_month);
+  const readCons = last12.map(b => b.current_reading||null);
+  const readSol = last12.map(b => b.solar_current_month_balance||null); // Treat balance as cumulative reading proxy for demo
+  
+  drawChart('chart-readings', 'line', readLabels, [
+    { label: 'Grid Meter Reading', data: readCons, borderColor: '#f43f5e', tension:0, pointRadius:4 },
+    { label: 'Solar Banked Units', data: readSol, borderColor: '#eab308', tension:0, pointRadius:4 }
+  ]);
+}
+
+function drawChart(id, type, labels, datasets, hideGrid=false, scaleOpts={}) {
+  const ctx = document.getElementById(id);
+  if(!ctx) return;
+  if(charts[id]) charts[id].destroy();
+  const tc = settings.dark ? '#94a3b8' : '#64748b';
+  const gc = settings.dark ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.05)';
+  
+  charts[id] = new Chart(ctx, {
     type, data: { labels, datasets },
-    options: deepMerge(defaults, extraOptions)
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: tc, font:{family:'Plus Jakarta Sans', size:10, weight:'700'} } } },
+      scales: {
+        x: { grid:{display:!hideGrid, color:gc}, ticks:{color:tc, font:{size:10, weight:'600'}}, ...scaleOpts.x },
+        y: { grid:{display:!hideGrid, color:gc}, ticks:{color:tc, font:{size:10, weight:'600'}}, ...scaleOpts.y }
+      }
+    }
   });
 }
 
-function deepMerge(a, b) {
-  const out = { ...a };
-  for (const k in b) { if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) out[k] = deepMerge(a[k] || {}, b[k]); else out[k] = b[k]; }
-  return out;
+/* ════════════════════════════════════════════════════
+   HISTORY
+════════════════════════════════════════════════════ */
+function renderHistory(active) {
+  const tbody = document.getElementById('history-body');
+  if(active.length===0) { tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px">No bills found for this account.</td></tr>`; return; }
+  
+  tbody.innerHTML = [...active].reverse().map(b => `
+    <tr>
+      <td><span class="pill" style="background:var(--slate100);color:var(--slate700)">${(b.account_number||'').slice(-4)}</span></td>
+      <td><b>${b.bill_month}</b></td>
+      <td class="mono">${b.total_units_consumed||0}</td>
+      <td class="mono" style="color:var(--text-muted)">${b.current_reading||'—'}</td>
+      <td class="mono" style="font-weight:800;color:var(--sky-d)">₹${b.current_bill_amount||0}</td>
+      <td class="mono" style="color:var(--volt-d)">${b.solar_current_month_balance||0}</td>
+      <td>${b.power_factor||'—'}</td>
+      <td><button onclick="delBill(${b.id})" style="background:none;border:none;color:var(--rose);cursor:pointer"><i class="fa-solid fa-trash"></i></button></td>
+    </tr>
+  `).join('');
 }
-
-// ════════════════════════════════════════════════════
-//  MODAL
-// ════════════════════════════════════════════════════
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.style.display = 'none'; }));
-
-// ════════════════════════════════════════════════════
-//  TOAST
-// ════════════════════════════════════════════════════
-let toastTimer;
-function toast(msg, type) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.style.background = type === 'error' ? '#dc2626' : (darkMode ? '#334155' : '#0f172a');
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+function delBill(id) {
+  if(!confirm('Delete this bill?')) return;
+  bills = bills.filter(b => b.id !== id);
+  saveLocal(); renderAll(); toast('Deleted');
 }
 
 // Boot
