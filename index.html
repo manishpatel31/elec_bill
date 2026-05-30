@@ -10,6 +10,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(typeof pdfjsLib!=='undefined') pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <style>
 :root{--sky:#0ea5e9;--sky-d:#0284c7;--volt:#eab308;--volt-d:#a16207;--em:#10b981;--em-d:#059669;--rose:#f43f5e;--vi:#8b5cf6;--s50:#f8fafc;--s100:#f1f5f9;--s200:#e2e8f0;--s300:#cbd5e1;--s400:#94a3b8;--s500:#64748b;--s600:#475569;--s700:#334155;--s800:#1e293b;--s900:#0f172a;--bg:#f0f9ff;--card:#fff;--border:var(--s200);--txt:var(--s900);--muted:var(--s500);--r:18px}
 .dark{--bg:#020b18;--card:rgba(15,23,42,.9);--border:rgba(255,255,255,.07);--txt:#e2e8f0;--muted:#64748b;--s50:#0f172a;--s100:#1e293b;--s200:#334155}
@@ -102,6 +104,7 @@ input:checked+.tslider::before{transform:translateX(18px)}
 .prog{height:6px;background:var(--s200);border-radius:999px;overflow:hidden;margin-top:4px}
 .prog-bar{height:100%;border-radius:999px;transition:width .6s ease}
 .dark .prog{background:var(--s700)}
+@keyframes spin{to{transform:rotate(360deg)}}
 .hist-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:800;background:rgba(14,165,233,.08);color:var(--sky);border:1px solid rgba(14,165,233,.15)}
 #bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:60;background:rgba(255,255,255,.95);backdrop-filter:blur(20px);border-top:1px solid var(--s200);padding-bottom:env(safe-area-inset-bottom,0px)}
 .dark #bottom-nav{background:rgba(15,23,42,.96);border-top-color:rgba(255,255,255,.06)}
@@ -212,9 +215,51 @@ input:checked+.tslider::before{transform:translateX(18px)}
 <!-- ══════════════════ ADD BILL ══════════════════ -->
 <div id="tab-addbill" class="tab">
   <div style="max-width:720px;margin:0 auto">
-    <div style="text-align:center;margin-bottom:24px">
+    <div style="text-align:center;margin-bottom:20px">
       <h2 style="font-size:1.3rem;font-weight:900;margin-bottom:4px">📋 Add Electricity Bill</h2>
-      <p style="font-size:12px;color:var(--muted);font-weight:600">Use any free AI assistant (ChatGPT, Gemini, Grok) to extract data from your bill</p>
+      <p style="font-size:12px;color:var(--muted);font-weight:600" id="addbill-subtitle">Configure an AI key in Settings for one-click auto-extraction</p>
+    </div>
+
+    <!-- AUTO-EXTRACT CARD — visible when AI key configured -->
+    <div id="auto-extract-card" style="display:none;margin-bottom:16px" class="card" style="border:2px solid var(--em);overflow:hidden">
+      <div style="background:linear-gradient(135deg,rgba(16,185,129,.1),rgba(14,165,233,.06));padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;background:linear-gradient(135deg,var(--em),#059669);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 10px rgba(16,185,129,.3)">🤖</div>
+          <div>
+            <h3 style="font-weight:900;font-size:.95rem">Auto-Extract — Drop &amp; Done</h3>
+            <p style="font-size:11px;color:var(--muted);font-weight:600" id="ae-engine-label">AI engine ready</p>
+          </div>
+        </div>
+        <div id="ae-engine-pills" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+      <div style="padding:20px">
+        <label id="ae-dropzone" style="display:block;border:2px dashed var(--em);border-radius:14px;padding:32px 20px;text-align:center;cursor:pointer;background:rgba(16,185,129,.03);transition:all .2s" ondragover="aeDragOver(event)" ondragleave="aeDragLeave(event)" ondrop="aeDrop(event)">
+          <input type="file" id="ae-file" accept="application/pdf,image/*" style="display:none" onchange="aeHandleFile(this.files[0])">
+          <div style="font-size:2.5rem;margin-bottom:10px">📂</div>
+          <h4 style="font-weight:800;color:var(--em);margin-bottom:4px">Drop your bill here or click to browse</h4>
+          <p style="font-size:11px;color:var(--muted);font-weight:600">PDF (recommended) · JPG · PNG · WEBP</p>
+          <div style="display:flex;gap:6px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+            <span class="pill pgreen">📄 PDF → text extract → AI parse</span>
+            <span class="pill psky">🖼️ Image → AI Vision</span>
+          </div>
+        </label>
+        <div id="ae-processing" style="display:none;text-align:center;padding:28px 0">
+          <div style="width:48px;height:48px;border-radius:50%;border:3px solid var(--em);border-top-color:transparent;animation:spin 1s linear infinite;margin:0 auto 14px"></div>
+          <h4 style="font-weight:800;margin-bottom:4px" id="ae-proc-title">Reading PDF…</h4>
+          <p style="font-size:11px;color:var(--muted);font-weight:600" id="ae-proc-sub">Extracting text with pdf.js</p>
+          <div style="height:4px;background:var(--s200);border-radius:999px;margin:12px auto 0;max-width:260px;overflow:hidden">
+            <div id="ae-prog" style="height:100%;background:linear-gradient(90deg,var(--em),var(--sky));border-radius:999px;width:0%;transition:width .5s"></div>
+          </div>
+        </div>
+        <div id="ae-error" style="display:none;margin-top:12px;padding:10px 14px;border-radius:10px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);color:var(--rose);font-size:12px;font-weight:700"></div>
+        <p style="font-size:10px;color:var(--muted);font-weight:600;margin-top:12px;text-align:center">🔒 Your API key stays in your browser. For PDFs, text is extracted locally then sent to AI. Images are sent directly to the AI Vision API.</p>
+      </div>
+    </div>
+
+    <!-- Divider — only shows when auto-extract available -->
+    <div id="ae-divider" style="display:none;text-align:center;margin:0 0 16px;position:relative">
+      <div style="height:1px;background:var(--border);position:absolute;top:50%;left:0;right:0"></div>
+      <span style="position:relative;background:var(--bg);padding:0 14px;font-size:10px;font-weight:900;color:var(--muted);letter-spacing:.08em">OR USE MANUAL AI PASTE</span>
     </div>
 
     <!-- Step Cards -->
@@ -424,6 +469,74 @@ input:checked+.tslider::before{transform:translateX(18px)}
         <input type="text" id="new-alias" placeholder="Alias (e.g. Home / Shop)" style="flex:1;min-width:120px;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--s50);color:var(--txt);font-size:12px;font-weight:600;outline:none;font-family:inherit">
         <button class="bprimary" onclick="addAccount()">+ Add</button>
       </div>
+    </div>
+
+    <!-- AI Keys (BYOK) -->
+    <div class="sec">AI Auto-Extraction — Add Your Free API Key</div>
+    <div class="card" style="padding:18px;margin-bottom:18px;border:1.5px solid rgba(16,185,129,.3)">
+      <p style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:16px;line-height:1.7">
+        Add any one key below to enable <b>one-click bill extraction</b> — drag a PDF and AI does the rest.<br>
+        All keys are free to get. Your key is stored only in your browser, never on any server.
+      </p>
+
+      <!-- Groq -->
+      <div style="padding:14px;background:var(--s50);border-radius:12px;border:1px solid var(--border);margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="width:30px;height:30px;background:linear-gradient(135deg,#f97316,#eab308);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px">⚡</div>
+          <div>
+            <b style="font-size:13px">Groq</b>
+            <span class="pill pgreen" style="margin-left:6px">Fastest · Free 6000 TPM</span>
+          </div>
+          <a href="https://console.groq.com/keys" target="_blank" style="margin-left:auto;font-size:11px;font-weight:800;color:var(--sky);text-decoration:none">Get free key →</a>
+        </div>
+        <p style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:8px">Best for PDFs — lightning fast, uses Llama 3.3 70B for text, Llama Vision for images.</p>
+        <div style="display:flex;gap:8px">
+          <input type="password" id="s-groq" placeholder="gsk_xxxxxxxxxxxxxxxxxxxx" style="flex:1;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--txt);font-size:12px;font-weight:600;outline:none;font-family:inherit">
+          <button class="bprimary" style="font-size:11px;padding:7px 14px" onclick="saveAIKey('groq')">Save</button>
+          <button class="bghost" style="font-size:11px;padding:7px 10px" onclick="testAIKey('groq')">Test</button>
+          <button class="bghost" style="font-size:11px;padding:7px 10px;color:var(--rose)" onclick="clearAIKey('groq')"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>
+
+      <!-- Gemini -->
+      <div style="padding:14px;background:var(--s50);border-radius:12px;border:1px solid var(--border);margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="width:30px;height:30px;background:linear-gradient(135deg,#4285F4,#34A853);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px">✦</div>
+          <div>
+            <b style="font-size:13px">Google Gemini Flash</b>
+            <span class="pill psky" style="margin-left:6px">Free 1500 req/day</span>
+          </div>
+          <a href="https://aistudio.google.com/apikey" target="_blank" style="margin-left:auto;font-size:11px;font-weight:800;color:var(--sky);text-decoration:none">Get free key →</a>
+        </div>
+        <p style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:8px">Reads PDFs &amp; images natively without text extraction. 1 million tokens/day free.</p>
+        <div style="display:flex;gap:8px">
+          <input type="password" id="s-gemini" placeholder="AIzaSy_xxxxxxxxxxxxxxxxxxxx" style="flex:1;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--txt);font-size:12px;font-weight:600;outline:none;font-family:inherit">
+          <button class="bprimary" style="font-size:11px;padding:7px 14px" onclick="saveAIKey('gemini')">Save</button>
+          <button class="bghost" style="font-size:11px;padding:7px 10px" onclick="testAIKey('gemini')">Test</button>
+          <button class="bghost" style="font-size:11px;padding:7px 10px;color:var(--rose)" onclick="clearAIKey('gemini')"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>
+
+      <!-- OpenRouter -->
+      <div style="padding:14px;background:var(--s50);border-radius:12px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="width:30px;height:30px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px">🔀</div>
+          <div>
+            <b style="font-size:13px">OpenRouter</b>
+            <span class="pill pvolt" style="margin-left:6px">Free tier models</span>
+          </div>
+          <a href="https://openrouter.ai/keys" target="_blank" style="margin-left:auto;font-size:11px;font-weight:800;color:var(--sky);text-decoration:none">Get free key →</a>
+        </div>
+        <p style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:8px">Access 100+ AI models. Many free models available (Gemma, Llama, Mistral, etc.).</p>
+        <div style="display:flex;gap:8px">
+          <input type="password" id="s-openrouter" placeholder="sk-or-v1-xxxxxxxxxxxxxxxxxxxx" style="flex:1;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--txt);font-size:12px;font-weight:600;outline:none;font-family:inherit">
+          <button class="bprimary" style="font-size:11px;padding:7px 14px" onclick="saveAIKey('openrouter')">Save</button>
+          <button class="bghost" style="font-size:11px;padding:7px 10px" onclick="testAIKey('openrouter')">Test</button>
+          <button class="bghost" style="font-size:11px;padding:7px 10px;color:var(--rose)" onclick="clearAIKey('openrouter')"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>
+
+      <div id="ai-key-status" style="display:none;margin-top:12px;padding:10px 12px;border-radius:10px;font-size:12px;font-weight:700"></div>
     </div>
 
     <!-- Tariff Config -->
@@ -712,9 +825,10 @@ function init() {
   if(settings.dark) { document.documentElement.classList.add('dark'); document.getElementById('ti').className = 'fa-solid fa-sun'; }
   document.getElementById('prompt-display').textContent = PROMPT;
   loadSettingsUI();
+  loadAIKeysUI();
+  updateAutoExtractUI();
   updateAccSwitcher();
   renderAll();
-  // Try gist pull on startup
   const tok = localStorage.getItem('gh_tok'), gid = localStorage.getItem('gh_gid');
   if(tok && gid) gistPull(true);
 }
@@ -1527,6 +1641,350 @@ function toast(msg,type='ok') {
 function famt(v) {
   const n = parseFloat(v)||0;
   return n < 0 ? `-₹${Math.abs(n)}` : `₹${n}`;
+}
+
+// ═══════════════════════════════════════════════════
+//  AI KEY MANAGEMENT
+// ═══════════════════════════════════════════════════
+const AI_KEYS = { groq:'groq_key', gemini:'gemini_key', openrouter:'or_key' };
+
+function getActiveAIEngine() {
+  if(window._activeEngine) return window._activeEngine;
+  if(localStorage.getItem('groq_key'))   return 'groq';
+  if(localStorage.getItem('gemini_key')) return 'gemini';
+  if(localStorage.getItem('or_key'))     return 'openrouter';
+  return null;
+}
+
+function saveAIKey(engine) {
+  const ids = { groq:'s-groq', gemini:'s-gemini', openrouter:'s-openrouter' };
+  const key = document.getElementById(ids[engine])?.value.trim();
+  if(!key) { aiKeyStatus('Enter a key first','red'); return; }
+  localStorage.setItem(AI_KEYS[engine], key);
+  aiKeyStatus(`✅ ${engine} key saved!`,'green');
+  toast(`✅ ${engine} key saved`);
+  updateAutoExtractUI();
+}
+
+function clearAIKey(engine) {
+  localStorage.removeItem(AI_KEYS[engine]);
+  const ids = { groq:'s-groq', gemini:'s-gemini', openrouter:'s-openrouter' };
+  const el = document.getElementById(ids[engine]);
+  if(el) el.value = '';
+  if(window._activeEngine === engine) window._activeEngine = null;
+  aiKeyStatus(`🗑️ ${engine} key removed`,'green');
+  updateAutoExtractUI();
+}
+
+async function testAIKey(engine) {
+  const ids = { groq:'s-groq', gemini:'s-gemini', openrouter:'s-openrouter' };
+  const key = document.getElementById(ids[engine])?.value.trim() || localStorage.getItem(AI_KEYS[engine]);
+  if(!key) { aiKeyStatus('Enter a key first','red'); return; }
+  aiKeyStatus('Testing connection…','green');
+  try {
+    if(engine === 'groq') {
+      const r = await fetch('https://api.groq.com/openai/v1/models',
+        {headers:{'Authorization':'Bearer '+key}});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      aiKeyStatus('✅ Groq key valid! Ready to use.','green');
+    } else if(engine === 'gemini') {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      aiKeyStatus('✅ Gemini key valid! Ready to use.','green');
+    } else {
+      const r = await fetch('https://openrouter.ai/api/v1/models',
+        {headers:{'Authorization':'Bearer '+key}});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      aiKeyStatus('✅ OpenRouter key valid! Ready to use.','green');
+    }
+    toast(`✅ ${engine} connected!`);
+  } catch(e) { aiKeyStatus('❌ '+e.message,'red'); }
+}
+
+function aiKeyStatus(msg, color) {
+  const el = document.getElementById('ai-key-status'); if(!el) return;
+  el.style.display   = 'block';
+  el.style.background = color==='green'?'rgba(16,185,129,.1)':'rgba(244,63,94,.1)';
+  el.style.border    = `1px solid rgba(${color==='green'?'16,185,129':'244,63,94'},.25)`;
+  el.style.color     = color==='green'?'var(--em)':'var(--rose)';
+  el.textContent     = msg;
+}
+
+function loadAIKeysUI() {
+  const ids = { groq:'s-groq', gemini:'s-gemini', openrouter:'s-openrouter' };
+  for(const [eng, storKey] of Object.entries(AI_KEYS)) {
+    const v = localStorage.getItem(storKey);
+    const el = document.getElementById(ids[eng]);
+    if(el && v) el.value = v;
+  }
+}
+
+function updateAutoExtractUI() {
+  const engine = getActiveAIEngine();
+  const card   = document.getElementById('auto-extract-card');
+  const div    = document.getElementById('ae-divider');
+  const sub    = document.getElementById('addbill-subtitle');
+  const label  = document.getElementById('ae-engine-label');
+  const pills  = document.getElementById('ae-engine-pills');
+  if(!card) return;
+
+  if(engine) {
+    card.style.display = 'block';
+    if(div)  div.style.display  = 'block';
+    const names = { groq:'⚡ Groq Llama 3.3 70B', gemini:'✦ Gemini Flash 1.5', openrouter:'🔀 OpenRouter' };
+    if(label) label.textContent = (names[engine]||engine) + ' · Active';
+    if(sub)   sub.textContent   = '🤖 AI key configured — drag your bill below for instant extraction';
+    // Show all configured engine pills
+    if(pills) pills.innerHTML = Object.entries(AI_KEYS)
+      .filter(([,k]) => localStorage.getItem(k))
+      .map(([eng]) => {
+        const active = (eng === (window._activeEngine || getActiveAIEngine()));
+        return `<span class="pill ${active?'pgreen':'psky'}" style="cursor:pointer;padding:4px 10px" onclick="switchEngine('${eng}')">${eng==='groq'?'⚡':eng==='gemini'?'✦':'🔀'} ${eng}${active?' ✓':''}</span>`;
+      }).join('');
+  } else {
+    card.style.display = 'none';
+    if(div) div.style.display  = 'none';
+    if(sub) sub.textContent    = 'Add a free AI key in Settings for one-click auto-extraction';
+  }
+}
+
+function switchEngine(eng) {
+  window._activeEngine = eng;
+  updateAutoExtractUI();
+  toast(`Switched to ${eng}`);
+}
+
+// ═══════════════════════════════════════════════════
+//  AUTO-EXTRACT FILE HANDLING
+// ═══════════════════════════════════════════════════
+function aeDragOver(e)  { e.preventDefault(); document.getElementById('ae-dropzone').style.background='rgba(16,185,129,.1)'; }
+function aeDragLeave()  { document.getElementById('ae-dropzone').style.background='rgba(16,185,129,.03)'; }
+function aeDrop(e) {
+  e.preventDefault();
+  document.getElementById('ae-dropzone').style.background = 'rgba(16,185,129,.03)';
+  const f = e.dataTransfer.files[0];
+  if(f) aeHandleFile(f);
+}
+
+async function aeHandleFile(file) {
+  if(!file) return;
+  const engine = getActiveAIEngine();
+  if(!engine) { toast('Add an AI key in Settings first','err'); return; }
+
+  const valid = ['application/pdf','image/png','image/jpeg','image/webp','image/jpg'].includes(file.type);
+  if(!valid) { aeError('Unsupported file. Use PDF, JPG, or PNG.'); return; }
+
+  const dropzone = document.getElementById('ae-dropzone');
+  const proc     = document.getElementById('ae-processing');
+  dropzone.style.display = 'none';
+  proc.style.display     = 'block';
+  document.getElementById('ae-error').style.display = 'none';
+
+  try {
+    let result;
+
+    if(file.type === 'application/pdf') {
+      aeSetProg(15, 'Extracting PDF text…', 'Using pdf.js — stays on your device');
+      const text = await extractPDFText(file);
+      if(!text || text.trim().length < 80)
+        throw new Error('Could not read text from this PDF. Try uploading as a photo of the bill instead.');
+      aeSetProg(50, `Sending to ${engine} AI…`, `~${Math.round(text.length/4)} tokens`);
+      result = await callAIText(text, engine);
+    } else {
+      aeSetProg(30, `Sending image to ${engine} Vision…`, 'Encoding image');
+      const b64 = await toBase64(file);
+      aeSetProg(60, `${engine} Vision reading bill…`, 'Identifying all fields');
+      result = await callAIVision(b64, file.type, engine);
+    }
+
+    if(!result || (!result.bill_month && !result.total_units_consumed))
+      throw new Error('AI returned empty data. Check if the bill image is clear and try again.');
+
+    aeSetProg(100, 'Done! ✅', 'All fields extracted');
+    parsedTemp = { ...result, id: Date.now(), saved_at: new Date().toISOString(), source: 'ai_'+engine };
+
+    setTimeout(() => {
+      dropzone.style.display = 'block';
+      proc.style.display     = 'none';
+      showPreview(parsedTemp);
+    }, 500);
+
+  } catch(e) {
+    dropzone.style.display = 'block';
+    proc.style.display     = 'none';
+    aeError((e.message||'Extraction failed') + ' — Use manual paste as backup.');
+    console.error('Auto-extract error:', e);
+  }
+}
+
+function aeSetProg(pct, title, sub) {
+  const p = document.getElementById('ae-prog'); if(p) p.style.width = pct+'%';
+  const t = document.getElementById('ae-proc-title'); if(t) t.textContent = title;
+  const s = document.getElementById('ae-proc-sub');   if(s) s.textContent = sub;
+}
+function aeError(msg) {
+  const el = document.getElementById('ae-error');
+  if(el) { el.style.display='block'; el.textContent='❌ '+msg; }
+}
+
+// ═══════════════════════════════════════════════════
+//  PDF.JS TEXT EXTRACTION
+// ═══════════════════════════════════════════════════
+async function extractPDFText(file) {
+  if(typeof pdfjsLib === 'undefined')
+    throw new Error('pdf.js not loaded — refresh the page and try again.');
+  const buf  = await file.arrayBuffer();
+  const pdf  = await pdfjsLib.getDocument({data: buf}).promise;
+  let   text = '';
+  for(let i = 1; i <= pdf.numPages; i++) {
+    const page    = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(s => s.str).join(' ') + '\n';
+  }
+  return text;
+}
+
+function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = () => res(r.result.split(',')[1]);
+    r.onerror = () => rej(new Error('File read failed'));
+    r.readAsDataURL(file);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  AI CALLS — TEXT (from PDF)
+// ═══════════════════════════════════════════════════
+const SYS_PROMPT = `You are an SBPDCL (South Bihar Power Distribution Company) electricity bill parser. Extract every piece of data and return ONLY a valid JSON object — no markdown, no explanation, no code fences, just raw JSON starting with {.
+
+The bill is in Hindi (romanised like "ibala maah","Kaataa saMKyaa","paavar fOxkTr") mixed with English. Required JSON keys:
+bill_month, bill_date, bill_number, account_number, consumer_id, mru_number, consumer_name, address, mobile, consumer_category, meter_phase, area_type, connection_date, division, sub_division, section, feeder_code, route_pole_code, sanctioned_load_kw, recorded_demand_kw, meter_number, meter_owner, bill_basis, current_reading_date, previous_reading_date, current_reading_ph1, previous_reading_ph1, units_ph1, current_reading_ph2, previous_reading_ph2, units_ph2, total_units_consumed, multiplying_factor, power_factor, bill_days, free_units_ghoshit, subsidised_units, advance_deposit_balance, energy_balance, late_fee_balance, other_prev_charges, total_previous_balance, energy_charge, fixed_charge, excess_demand_charge, electricity_duty, capacitor_charge, other_charges, subtotal, subsidy_free_units, subsidy_subsidised, current_bill_amount, late_payment_surcharge, remission, total_demand, security_deposit_int, concession_amount, due_date, amount_due_by_date, amount_due_plus10, prev_payment_amount, prev_payment_date, prev_payment_receipt, security_deposit_amt, solar_current_balance, solar_prev_balance, avg_supply_hours, history_consumption, is_zero_bill, notes.
+
+For history_consumption: extract the last 11 months table as {"MON-YY": units, ...} e.g. {"APR-26":0,"MAR-26":610}.
+Use 0 for missing numbers, "" for missing strings, negative numbers for credits/subsidies.`;
+
+async function callAIText(text, engine) {
+  const key = localStorage.getItem(AI_KEYS[engine]);
+  if(!key) throw new Error(`No ${engine} API key found. Add it in Settings.`);
+  const userMsg = `Extract all SBPDCL bill fields from this bill text:\n\n${text.slice(0, 7000)}`;
+
+  if(engine === 'groq') {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization':'Bearer '+key, 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role:'system', content:SYS_PROMPT }, { role:'user', content:userMsg }],
+        response_format: { type:'json_object' },
+        temperature: 0, max_tokens: 2500
+      })
+    });
+    if(!r.ok) { const e=await r.json(); throw new Error(e.error?.message || 'Groq error '+r.status); }
+    const d = await r.json();
+    return JSON.parse(d.choices[0].message.content);
+
+  } else if(engine === 'gemini') {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts:[{ text: SYS_PROMPT+'\n\n'+userMsg }] }],
+        generationConfig: { temperature:0, maxOutputTokens:2500, responseMimeType:'application/json' }
+      })
+    });
+    if(!r.ok) { const e=await r.json(); throw new Error(e.error?.message || 'Gemini error '+r.status); }
+    const d   = await r.json();
+    const raw = d.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    return JSON.parse(raw.replace(/```json|```/g,'').trim());
+
+  } else { // openrouter
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization':'Bearer '+key, 'Content-Type':'application/json',
+        'HTTP-Referer':'https://bijlitracker.app', 'X-Title':'Bijli Tracker' },
+      body: JSON.stringify({
+        model: 'google/gemma-3-27b-it:free',
+        messages: [{ role:'system', content:SYS_PROMPT }, { role:'user', content:userMsg }],
+        response_format: { type:'json_object' },
+        temperature: 0, max_tokens: 2500
+      })
+    });
+    if(!r.ok) { const e=await r.json(); throw new Error(e.error?.message || 'OpenRouter error '+r.status); }
+    const d   = await r.json();
+    const raw = d.choices?.[0]?.message?.content || '{}';
+    try { return JSON.parse(raw); }
+    catch { const m=raw.match(/\{[\s\S]*\}/); return JSON.parse(m?m[0]:'{}'); }
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  AI CALLS — VISION (for images)
+// ═══════════════════════════════════════════════════
+async function callAIVision(b64, mimeType, engine) {
+  const key = localStorage.getItem(AI_KEYS[engine]);
+  if(!key) throw new Error(`No ${engine} API key found. Add it in Settings.`);
+  const instrText = SYS_PROMPT + '\n\nExtract all SBPDCL bill fields from the image and return JSON only.';
+
+  if(engine === 'groq') {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization':'Bearer '+key, 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        messages: [{ role:'user', content:[
+          { type:'text', text: instrText },
+          { type:'image_url', image_url:{ url:`data:${mimeType};base64,${b64}` }}
+        ]}],
+        temperature: 0, max_tokens: 2500
+      })
+    });
+    if(!r.ok) { const e=await r.json(); throw new Error(e.error?.message || 'Groq Vision error '+r.status); }
+    const d   = await r.json();
+    const raw = d.choices[0].message.content;
+    const m   = raw.match(/\{[\s\S]*\}/);
+    if(!m) throw new Error('No JSON in Groq response. Try PDF upload instead.');
+    return JSON.parse(m[0]);
+
+  } else if(engine === 'gemini') {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts:[
+          { text: instrText },
+          { inline_data:{ mime_type:mimeType, data:b64 }}
+        ]}],
+        generationConfig: { temperature:0, maxOutputTokens:2500, responseMimeType:'application/json' }
+      })
+    });
+    if(!r.ok) { const e=await r.json(); throw new Error(e.error?.message || 'Gemini Vision error '+r.status); }
+    const d   = await r.json();
+    const raw = d.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    return JSON.parse(raw.replace(/```json|```/g,'').trim());
+
+  } else { // openrouter vision
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization':'Bearer '+key, 'Content-Type':'application/json',
+        'HTTP-Referer':'https://bijlitracker.app', 'X-Title':'Bijli Tracker' },
+      body: JSON.stringify({
+        model: 'google/gemini-flash-1.5-8b',
+        messages: [{ role:'user', content:[
+          { type:'text', text: instrText },
+          { type:'image_url', image_url:{ url:`data:${mimeType};base64,${b64}` }}
+        ]}],
+        temperature: 0, max_tokens: 2500
+      })
+    });
+    if(!r.ok) { const e=await r.json(); throw new Error(e.error?.message || 'OpenRouter Vision error '+r.status); }
+    const d   = await r.json();
+    const raw = d.choices?.[0]?.message?.content || '{}';
+    try { return JSON.parse(raw); }
+    catch { const m=raw.match(/\{[\s\S]*\}/); return JSON.parse(m?m[0]:'{}'); }
+  }
 }
 
 init();
