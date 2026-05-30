@@ -3,827 +3,1532 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bijli Tracker 2.0 — Advanced Analyser</title>
-<meta name="description" content="Smart electricity bill analyser for SBPDCL consumers">
+<title>Bijli Tracker — SBPDCL Bill Manager</title>
 <meta name="theme-color" content="#0ea5e9">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230ea5e9'/%3E%3Ctext y='48' x='8' font-size='44'%3E⚡%3C/text%3E%3C/svg%3E">
-
-<!-- Fonts & Icons -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-
-<!-- Chart.js & PDF.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-
 <style>
-/* ═══════════════════════════════════════
-   ROOT VARS & BASE
-═══════════════════════════════════════ */
-:root {
-  --sky: #0ea5e9; --sky-d: #0284c7; --sky-l: #e0f2fe;
-  --volt: #eab308; --volt-d: #a16207;
-  --emerald: #10b981; --emerald-d: #059669;
-  --rose: #f43f5e; --rose-d: #e11d48;
-  --violet: #8b5cf6; --violet-d: #7c3aed;
-  --slate50: #f8fafc; --slate100: #f1f5f9; --slate200: #e2e8f0;
-  --slate300: #cbd5e1; --slate400: #94a3b8; --slate500: #64748b;
-  --slate600: #475569; --slate700: #334155; --slate800: #1e293b;
-  --slate900: #0f172a; --slate950: #020617;
-  --card-bg: #fff; --card-border: var(--slate200);
-  --body-bg: #f0f9ff; --text: var(--slate900); --text-muted: var(--slate500);
-  --radius: 20px; --radius-sm: 12px;
-}
-.dark {
-  --card-bg: rgba(15,23,42,0.9); --card-border: rgba(255,255,255,0.07);
-  --body-bg: #020b18; --text: #e2e8f0; --text-muted: #64748b;
-  --slate50: #0f172a; --slate100: #1e293b; --slate200: #334155;
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--body-bg); color: var(--text); min-height: 100vh; font-size: 14px; line-height: 1.6; }
-body::before { content:''; position:fixed; inset:0; z-index:-1; pointer-events:none; background: radial-gradient(ellipse 80% 50% at 0% 0%, rgba(14,165,233,.12) 0,transparent 60%), radial-gradient(ellipse 60% 40% at 100% 0%, rgba(234,179,8,.09) 0,transparent 55%); background-attachment: fixed; }
-.dark body::before { background: radial-gradient(ellipse 80% 50% at 0% 0%, rgba(14,165,233,.18) 0,transparent 55%), radial-gradient(ellipse 60% 40% at 100% 0%, rgba(234,179,8,.12) 0,transparent 50%); }
-
-::-webkit-scrollbar { width:6px; height:6px; }
-::-webkit-scrollbar-track { background:transparent; }
-::-webkit-scrollbar-thumb { background:var(--slate300); border-radius:4px; }
-.dark ::-webkit-scrollbar-thumb { background:var(--slate600); }
-
-/* Components */
-.glass { background: rgba(255,255,255,0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.7); }
-.dark .glass { background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.06); }
-.card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,.02); transition: all .3s ease; }
-.card:hover { box-shadow: 0 8px 24px rgba(0,0,0,.06); }
-.sec-title { font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.12em; color:var(--text-muted); display:flex; align-items:center; gap:10px; margin-bottom:14px; }
-.sec-title::after { content:''; flex:1; height:1px; background:var(--slate200); }
-.dark .sec-title::after { background:var(--slate700); }
-
-/* Buttons */
-.btn-primary { background:linear-gradient(135deg,var(--sky),#6366f1); color:#fff; border:none; border-radius:10px; padding:8px 18px; font-weight:800; font-size:12px; cursor:pointer; display:inline-flex; align-items:center; gap:8px; box-shadow:0 4px 14px rgba(14,165,233,.3); transition:all .2s; font-family:inherit; }
-.btn-primary:hover { transform:translateY(-1px); filter:brightness(1.1); }
-.btn-ghost { background:transparent; border:1px solid var(--card-border); color:var(--text-muted); border-radius:10px; padding:8px 16px; font-weight:700; font-size:12px; cursor:pointer; transition:all .2s; font-family:inherit; }
-.btn-ghost:hover { border-color:var(--sky); color:var(--sky); background:rgba(14,165,233,.04); }
-
-/* Header & Acc Switcher */
-header { position: sticky; top:0; z-index:50; padding: 12px 20px; display: flex; align-items:center; justify-content:space-between; border-bottom: 1px solid rgba(255,255,255,.5); }
-.dark header { border-bottom-color: rgba(255,255,255,.06); }
-.logo h1 { font-family: 'Syne', sans-serif; font-size:1.2rem; font-weight:800; background: linear-gradient(135deg,#0ea5e9,#6366f1); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.acc-select { appearance:none; background:var(--slate100) url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") no-repeat right 10px center; background-size: 14px; padding:6px 30px 6px 14px; border-radius:12px; border:1px solid var(--slate200); font-size:11px; font-weight:800; color:var(--text); cursor:pointer; font-family:inherit; outline:none; }
-.dark .acc-select { background-color:var(--slate800); border-color:var(--slate700); }
-
-/* Navigation */
-.nav-wrap { display: flex; gap:4px; background: var(--slate100); padding:4px; border-radius:12px; border:1px solid var(--slate200); }
-.dark .nav-wrap { background:var(--slate800); border-color:var(--slate700); }
-.nav-btn { display:flex; align-items:center; gap:6px; padding:6px 14px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; border:none; background:transparent; color:var(--text-muted); transition:all .2s; }
-.nav-btn.active { background:#fff; color:var(--sky); box-shadow:0 2px 8px rgba(0,0,0,.08); }
-.dark .nav-btn.active { background:rgba(14,165,233,.15); box-shadow:none; }
-.tab-content { display:none; animation:fadeUp .3s ease; }
-.tab-content.active { display:block; }
-@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-
-/* Stat Cards */
-.stat-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:20px; }
-@media(min-width:768px) { .stat-grid { grid-template-columns:repeat(4,1fr); } }
-.stat-card { border-radius:16px; padding:16px; position:relative; overflow:hidden; color:#fff; }
-.stat-card .label { font-size:10px; font-weight:800; text-transform:uppercase; opacity:.8; margin-bottom:4px; }
-.stat-card .value { font-family:'JetBrains Mono',monospace; font-size:1.8rem; font-weight:700; line-height:1; }
-.stat-card .icon-bg { position:absolute; right:-10px; bottom:-10px; font-size:4rem; opacity:.15; pointer-events:none; }
-.sc-sky { background:linear-gradient(135deg,#0ea5e9,#6366f1); }
-.sc-volt { background:linear-gradient(135deg,#eab308,#f97316); }
-.sc-green { background:linear-gradient(135deg,#10b981,#059669); }
-.sc-rose { background:linear-gradient(135deg,#f43f5e,#ec4899); }
-
-/* Charts & Insight Cards */
-.chart-wrap { position:relative; padding:16px; border-radius:var(--radius); background:var(--card-bg); border:1px solid var(--card-border); margin-bottom:16px;}
-.chart-title { font-size:12px; font-weight:800; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between;}
-.insight-grid { display:grid; gap:12px; grid-template-columns:1fr; }
-@media(min-width:768px) { .insight-grid { grid-template-columns:repeat(3,1fr); } }
-.insight-card { padding:14px; border-radius:14px; border:1px solid var(--card-border); background:var(--card-bg); display:flex; gap:12px; align-items:start;}
-.insight-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
-
-/* File Drop Zone */
-.drop-zone { border:2px dashed var(--sky); border-radius:20px; padding:40px 20px; text-align:center; background:rgba(14,165,233,.03); cursor:pointer; transition:all .2s; }
-.drop-zone:hover, .drop-zone.dragover { background:rgba(14,165,233,.08); border-color:var(--sky-d); }
-
-/* Tables & Forms */
-.bill-table { width:100%; border-collapse:collapse; text-align:left; }
-.bill-table th { font-size:10px; font-weight:800; text-transform:uppercase; color:var(--text-muted); padding:10px; border-bottom:2px solid var(--card-border); }
-.bill-table td { padding:10px; border-bottom:1px solid var(--card-border); font-size:12px; font-weight:600; }
-.field { margin-bottom:12px; }
-.field label { display:block; font-size:10px; font-weight:800; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px; }
-.field input, .field select, .field textarea { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--card-border); background:var(--slate50); color:var(--text); font-size:12px; font-weight:600; outline:none; font-family:inherit; }
-.dark .field input, .dark .field select, .dark .field textarea { background:rgba(255,255,255,.05); }
-
-/* Modals & Toasts */
-.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; display:flex; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(4px); animation:fadeIn .2s; }
-.modal-box { background:var(--card-bg); border:1px solid var(--card-border); border-radius:20px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; box-shadow:0 20px 40px rgba(0,0,0,.3); }
-#toast { position:fixed; top:80px; right:16px; z-index:300; background:var(--slate900); color:#fff; padding:12px 16px; border-radius:10px; font-size:12px; font-weight:700; transform:translateX(150%); transition:transform .3s; display:flex; gap:8px; align-items:center;}
-#toast.show { transform:translateX(0); }
-
-/* Util */
-.pill { padding:3px 8px; border-radius:999px; font-size:9px; font-weight:800; text-transform:uppercase; }
-.mono { font-family:'JetBrains Mono',monospace; }
+:root{--sky:#0ea5e9;--sky-d:#0284c7;--volt:#eab308;--volt-d:#a16207;--em:#10b981;--em-d:#059669;--rose:#f43f5e;--vi:#8b5cf6;--s50:#f8fafc;--s100:#f1f5f9;--s200:#e2e8f0;--s300:#cbd5e1;--s400:#94a3b8;--s500:#64748b;--s600:#475569;--s700:#334155;--s800:#1e293b;--s900:#0f172a;--bg:#f0f9ff;--card:#fff;--border:var(--s200);--txt:var(--s900);--muted:var(--s500);--r:18px}
+.dark{--bg:#020b18;--card:rgba(15,23,42,.9);--border:rgba(255,255,255,.07);--txt:#e2e8f0;--muted:#64748b;--s50:#0f172a;--s100:#1e293b;--s200:#334155}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;font-size:14px}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse 80% 50% at 0 0,rgba(14,165,233,.11) 0,transparent 60%),radial-gradient(ellipse 60% 40% at 100% 0,rgba(234,179,8,.08) 0,transparent 55%),radial-gradient(ellipse 50% 60% at 50% 100%,rgba(139,92,246,.06) 0,transparent 55%)}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--s300);border-radius:4px}
+.glass{background:rgba(255,255,255,.85);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.7)}
+.dark .glass{background:rgba(15,23,42,.85);border:1px solid rgba(255,255,255,.06)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:0 2px 12px rgba(0,0,0,.04);transition:all .25s}
+.card:hover{box-shadow:0 6px 20px rgba(0,0,0,.07)}
+header{position:sticky;top:0;z-index:50;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(255,255,255,.5)}
+.dark header{border-bottom-color:rgba(255,255,255,.06)}
+.logo{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.logo-icon{width:36px;height:36px;background:linear-gradient(135deg,#0ea5e9,#6366f1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 10px rgba(14,165,233,.3)}
+.logo h1{font-family:'Syne',sans-serif;font-size:1.15rem;font-weight:800;background:linear-gradient(135deg,#0ea5e9,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.acc-select{appearance:none;background:var(--s100);padding:6px 28px 6px 12px;border-radius:10px;border:1px solid var(--s200);font-size:11px;font-weight:800;color:var(--txt);cursor:pointer;font-family:inherit;outline:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;background-size:12px;max-width:180px}
+.dark .acc-select{background-color:var(--s800);border-color:var(--s700)}
+.nav-wrap{display:flex;gap:3px;background:var(--s100);padding:4px;border-radius:12px;border:1px solid var(--s200)}
+.dark .nav-wrap{background:var(--s800);border-color:var(--s700)}
+.nb{display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:all .2s;font-family:inherit;white-space:nowrap}
+.nb.active{background:#fff;color:var(--sky);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.dark .nb.active{background:rgba(14,165,233,.15);box-shadow:none}
+main{max-width:1100px;margin:0 auto;padding:20px 16px}
+.tab{display:none;animation:fu .3s ease}.tab.active{display:block}
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.sec{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.sec::after{content:'';flex:1;height:1px;background:var(--s200)}.dark .sec::after{background:var(--s700)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:767px){.grid2,.grid3,.grid4{grid-template-columns:repeat(2,1fr)}.nb span{display:none}.hide-mob{display:none}header{flex-wrap:wrap}}
+.scard{border-radius:16px;padding:16px;position:relative;overflow:hidden;color:#fff;transition:transform .2s}
+.scard:hover{transform:translateY(-2px)}
+.scard .lbl{font-size:10px;font-weight:800;text-transform:uppercase;opacity:.8;margin-bottom:6px}
+.scard .val{font-family:'JetBrains Mono',monospace;font-size:1.75rem;font-weight:700;line-height:1}
+.scard .sub{font-size:11px;margin-top:4px;font-weight:600;opacity:.8}
+.scard .bg{position:absolute;right:-8px;bottom:-8px;font-size:3.5rem;opacity:.15;pointer-events:none}
+.sc1{background:linear-gradient(135deg,#0ea5e9,#6366f1);box-shadow:0 6px 16px rgba(14,165,233,.25)}
+.sc2{background:linear-gradient(135deg,#eab308,#f97316);box-shadow:0 6px 16px rgba(234,179,8,.25)}
+.sc3{background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 6px 16px rgba(16,185,129,.25)}
+.sc4{background:linear-gradient(135deg,#f43f5e,#ec4899);box-shadow:0 6px 16px rgba(244,63,94,.25)}
+.sc5{background:linear-gradient(135deg,#8b5cf6,#6d28d9);box-shadow:0 6px 16px rgba(139,92,246,.25)}
+.bprimary{background:linear-gradient(135deg,var(--sky),#6366f1);color:#fff;border:none;border-radius:10px;padding:8px 18px;font-weight:800;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;box-shadow:0 4px 12px rgba(14,165,233,.25);transition:all .2s;font-family:inherit}
+.bprimary:hover{transform:translateY(-1px);filter:brightness(1.1)}
+.bghost{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:8px 16px;font-weight:700;font-size:12px;cursor:pointer;transition:all .2s;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+.bghost:hover{border-color:var(--sky);color:var(--sky);background:rgba(14,165,233,.04)}
+.ifield{margin-bottom:12px}
+.ifield label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted);margin-bottom:4px;letter-spacing:.06em}
+.ifield input,.ifield select,.ifield textarea{width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--s50);color:var(--txt);font-size:12px;font-weight:600;outline:none;font-family:inherit;transition:border-color .2s}
+.ifield input:focus,.ifield select:focus,.ifield textarea:focus{border-color:var(--sky)}
+.dark .ifield input,.dark .ifield select,.dark .ifield textarea{background:rgba(255,255,255,.05)}
+.pill{padding:2px 8px;border-radius:999px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.psky{background:rgba(14,165,233,.1);color:var(--sky)}
+.pgreen{background:rgba(16,185,129,.1);color:var(--em)}
+.pred{background:rgba(244,63,94,.1);color:var(--rose)}
+.pvolt{background:rgba(234,179,8,.12);color:var(--volt-d)}
+.mono{font-family:'JetBrains Mono',monospace}
+.chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:16px}
+.ctitle{font-size:12px;font-weight:800;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.bill-table{width:100%;border-collapse:collapse}
+.bill-table th{font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted);padding:10px;border-bottom:2px solid var(--border);text-align:left;letter-spacing:.06em}
+.bill-table td{padding:10px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;vertical-align:middle}
+.bill-table tr:hover td{background:rgba(14,165,233,.03)}
+.icard{display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:14px;border:1px solid var(--border);background:var(--card)}
+.iicon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);animation:fi .2s}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+.modal-box{background:var(--card);border:1px solid var(--border);border-radius:22px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.35);animation:su .3s ease}
+@keyframes su{from{transform:translateY(16px)}to{transform:translateY(0)}}
+.m-hdr{padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.m-hdr h3{font-weight:800;font-size:.95rem}
+.m-body{padding:18px 22px}
+.m-ftr{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+#toast{position:fixed;bottom:24px;right:16px;z-index:300;background:var(--s900);color:#fff;padding:11px 16px;border-radius:12px;font-size:12px;font-weight:700;transform:translateY(80px);opacity:0;transition:all .35s cubic-bezier(.34,1.56,.64,1);display:flex;gap:8px;align-items:center;max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#toast.show{transform:translateY(0);opacity:1}
+.dark #toast{background:var(--s700)}
+.due-alert{border-radius:14px;padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:16px;border:1px solid}
+.step-num{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--sky),#6366f1);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex-shrink:0}
+.prompt-box{background:var(--s50);border:1px solid var(--border);border-radius:12px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.7;color:var(--muted);white-space:pre-wrap;word-break:break-word;max-height:280px;overflow-y:auto;cursor:text;user-select:all}
+.dark .prompt-box{background:rgba(255,255,255,.03)}
+.ai-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:999px;font-size:10px;font-weight:800;border:1px solid var(--border);background:var(--card);color:var(--txt);cursor:pointer;transition:all .2s}
+.ai-chip:hover{border-color:var(--sky);color:var(--sky);background:rgba(14,165,233,.05)}
+.toggle{position:relative;width:40px;height:22px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.tslider{position:absolute;inset:0;background:var(--s300);border-radius:999px;cursor:pointer;transition:.3s}
+.tslider::before{content:'';position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+input:checked+.tslider{background:var(--sky)}
+input:checked+.tslider::before{transform:translateX(18px)}
+.prog{height:6px;background:var(--s200);border-radius:999px;overflow:hidden;margin-top:4px}
+.prog-bar{height:100%;border-radius:999px;transition:width .6s ease}
+.dark .prog{background:var(--s700)}
+.hist-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:800;background:rgba(14,165,233,.08);color:var(--sky);border:1px solid rgba(14,165,233,.15)}
+#bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:60;background:rgba(255,255,255,.95);backdrop-filter:blur(20px);border-top:1px solid var(--s200);padding-bottom:env(safe-area-inset-bottom,0px)}
+.dark #bottom-nav{background:rgba(15,23,42,.96);border-top-color:rgba(255,255,255,.06)}
+.bni{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 4px 5px;gap:2px;border:none;background:transparent;cursor:pointer;color:var(--muted);transition:all .2s;font-family:inherit}
+.bni.active{color:var(--sky)}
+.bni i{font-size:17px;line-height:1}
+.bni span{font-size:8px;font-weight:800;text-transform:uppercase}
+@media(max-width:767px){#bottom-nav{display:flex}.nav-wrap{display:none}main{padding-bottom:calc(65px + env(safe-area-inset-bottom,0px))}}
 </style>
 </head>
 <body>
 
-<div id="toast"><i class="fa-solid fa-circle-check"></i> <span id="toast-msg">Success</span></div>
+<div id="toast"><i class="fa-solid fa-circle-check"></i><span id="tmsg">Done</span></div>
 
+<!-- HEADER -->
 <header class="glass">
-  <div style="display:flex;align-items:center;gap:12px">
-    <div style="width:36px;height:36px;background:linear-gradient(135deg,#0ea5e9,#6366f1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 10px rgba(14,165,233,.3)">⚡</div>
-    <div class="logo"><h1>Bijli 2.0</h1></div>
-  </div>
-  
-  <!-- Multi-Account Switcher -->
-  <select id="acc-select" class="acc-select" onchange="changeAccount(this.value)"></select>
-
-  <div style="display:flex;gap:12px;align-items:center">
-    <div class="nav-wrap">
-      <button class="nav-btn active" onclick="switchTab('dashboard')" data-tab="dashboard">Dashboard</button>
-      <button class="nav-btn" onclick="switchTab('upload')" data-tab="upload">Upload</button>
-      <button class="nav-btn" onclick="switchTab('analytics')" data-tab="analytics">Analytics</button>
-      <button class="nav-btn" onclick="switchTab('history')" data-tab="history">History</button>
-      <button class="nav-btn" onclick="switchTab('settings')" data-tab="settings"><i class="fa-solid fa-gear"></i></button>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <h1>Bijli Tracker</h1>
+      <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">SBPDCL Bill Manager</p>
     </div>
-    <button class="btn-ghost" style="padding:6px 10px" onclick="toggleDark()"><i id="theme-icon" class="fa-solid fa-moon"></i></button>
+  </div>
+  <select id="acc-select" class="acc-select" onchange="changeAccount(this.value)"></select>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div class="nav-wrap">
+      <button class="nb active" data-tab="dashboard" onclick="sw('dashboard')"><i class="fa-solid fa-house"></i><span> Home</span></button>
+      <button class="nb" data-tab="addbill" onclick="sw('addbill')"><i class="fa-solid fa-plus"></i><span> Add Bill</span></button>
+      <button class="nb" data-tab="analytics" onclick="sw('analytics')"><i class="fa-solid fa-chart-mixed"></i><span> Analytics</span></button>
+      <button class="nb" data-tab="history" onclick="sw('history')"><i class="fa-solid fa-list"></i><span> History</span></button>
+      <button class="nb" data-tab="solar" onclick="sw('solar')"><i class="fa-solid fa-sun"></i><span> Solar</span></button>
+      <button class="nb" data-tab="settings" onclick="sw('settings')"><i class="fa-solid fa-gear"></i></button>
+    </div>
+    <button class="bghost" style="padding:6px 10px" onclick="toggleDark()"><i id="ti" class="fa-solid fa-moon"></i></button>
   </div>
 </header>
 
-<main style="max-width:1100px;margin:0 auto;padding:24px 16px">
+<!-- MOBILE NAV -->
+<nav id="bottom-nav">
+  <button class="bni active" data-tab="dashboard" onclick="sw('dashboard')"><i class="fa-solid fa-house"></i><span>Home</span></button>
+  <button class="bni" data-tab="addbill" onclick="sw('addbill')"><i class="fa-solid fa-plus"></i><span>Add</span></button>
+  <button class="bni" data-tab="analytics" onclick="sw('analytics')"><i class="fa-solid fa-chart-mixed"></i><span>Charts</span></button>
+  <button class="bni" data-tab="history" onclick="sw('history')"><i class="fa-solid fa-list"></i><span>Bills</span></button>
+  <button class="bni" data-tab="solar" onclick="sw('solar')"><i class="fa-solid fa-sun"></i><span>Solar</span></button>
+</nav>
 
-<!-- ═══════════════════════════════════════════
-     DASHBOARD
-═══════════════════════════════════════════ -->
-<div id="tab-dashboard" class="tab-content active">
-  <div class="stat-grid">
-    <div class="stat-card sc-sky">
-      <div class="label">Current Month Units</div>
-      <div class="value mono" id="st-units">0</div>
-      <div style="font-size:11px;margin-top:4px;font-weight:600" id="st-units-sub">vs last month</div>
-      <div class="icon-bg">⚡</div>
+<main>
+
+<!-- ══════════════════ DASHBOARD ══════════════════ -->
+<div id="tab-dashboard" class="tab active">
+
+  <!-- Due Date Alert -->
+  <div id="due-alert" style="display:none"></div>
+
+  <!-- Stat Cards -->
+  <div class="grid4" style="margin-bottom:18px">
+    <div class="scard sc1">
+      <div class="lbl">Units This Month</div>
+      <div class="val" id="s-units">—</div>
+      <div class="sub" id="s-units-sub">kWh consumed</div>
+      <div class="bg">⚡</div>
     </div>
-    <div class="stat-card sc-volt">
-      <div class="label">Bill Amount</div>
-      <div class="value mono" id="st-amt">₹0</div>
-      <div style="font-size:11px;margin-top:4px;font-weight:600" id="st-amt-sub">due</div>
-      <div class="icon-bg">💰</div>
+    <div class="scard sc2">
+      <div class="lbl">Bill Amount</div>
+      <div class="val" id="s-amt">—</div>
+      <div class="sub" id="s-amt-sub">Net due</div>
+      <div class="bg">💰</div>
     </div>
-    <div class="stat-card" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9)">
-      <div class="label">Forecast Next Month</div>
-      <div class="value mono" id="st-forecast">₹0</div>
-      <div style="font-size:11px;margin-top:4px;font-weight:600" id="st-forecast-sub">Estimated</div>
-      <div class="icon-bg">🔮</div>
+    <div class="scard sc3">
+      <div class="lbl">Solar Balance</div>
+      <div class="val" id="s-solar">—</div>
+      <div class="sub" id="s-solar-sub">units banked</div>
+      <div class="bg">☀️</div>
     </div>
-    <div class="stat-card sc-green">
-      <div class="label">Solar Saved</div>
-      <div class="value mono" id="st-solar">0</div>
-      <div style="font-size:11px;margin-top:4px;font-weight:600" id="st-solar-sub">units this month</div>
-      <div class="icon-bg">☀️</div>
+    <div class="scard sc5">
+      <div class="lbl">Next Bill Est.</div>
+      <div class="val" id="s-fore">—</div>
+      <div class="sub" id="s-fore-sub">3+ bills needed</div>
+      <div class="bg">🔮</div>
     </div>
   </div>
 
-  <div class="sec-title">Tariff Slab Analyzer & Insights</div>
-  <div class="insight-grid" id="dash-insights">
-    <!-- Generated dynamically -->
+  <!-- Insights row -->
+  <div class="sec">Insights & Alerts</div>
+  <div id="insights" style="display:grid;gap:10px;margin-bottom:20px"></div>
+
+  <!-- Quick Chart + Bill Breakdown -->
+  <div class="grid2">
+    <div>
+      <div class="sec">Consumption Trend</div>
+      <div class="chart-wrap"><canvas id="c-quick" style="max-height:210px"></canvas></div>
+    </div>
+    <div>
+      <div class="sec">Latest Bill Breakdown</div>
+      <div class="card" style="padding:16px" id="bill-breakdown">
+        <div style="color:var(--muted);font-size:12px;font-weight:600;text-align:center;padding:20px">No bills yet</div>
+      </div>
+    </div>
   </div>
 
-  <div class="sec-title" style="margin-top:24px">Quick Trend</div>
-  <div class="chart-wrap"><canvas id="chart-quick" style="max-height:220px"></canvas></div>
+  <!-- Consumer Details Card -->
+  <div class="sec" style="margin-top:4px">Consumer Details</div>
+  <div class="card" style="padding:16px" id="consumer-card">
+    <div style="color:var(--muted);font-size:12px;font-weight:600;text-align:center;padding:16px">No bills yet</div>
+  </div>
 </div>
 
-<!-- ═══════════════════════════════════════════
-     UPLOAD & AI PROCESSING
-═══════════════════════════════════════════ -->
-<div id="tab-upload" class="tab-content">
-  <div style="max-width:700px;margin:0 auto">
+<!-- ══════════════════ ADD BILL ══════════════════ -->
+<div id="tab-addbill" class="tab">
+  <div style="max-width:720px;margin:0 auto">
     <div style="text-align:center;margin-bottom:24px">
-      <h2 style="font-size:1.4rem;font-weight:900">Add Electricity Bill</h2>
-      <p style="font-size:12px;color:var(--text-muted);font-weight:600">Select an engine below to process your bill</p>
+      <h2 style="font-size:1.3rem;font-weight:900;margin-bottom:4px">📋 Add Electricity Bill</h2>
+      <p style="font-size:12px;color:var(--muted);font-weight:600">Use any free AI assistant (ChatGPT, Gemini, Grok) to extract data from your bill</p>
     </div>
 
-    <div style="display:flex;gap:8px;justify-content:center;margin-bottom:20px">
-      <button class="btn-primary" id="btn-mode-ai" onclick="setUploadMode('ai')" style="background:var(--card-bg);color:var(--text);border:1px solid var(--card-border);box-shadow:none">🤖 Groq AI (Smart)</button>
-      <button class="btn-primary" id="btn-mode-local" onclick="setUploadMode('local')" style="background:var(--card-bg);color:var(--text);border:1px solid var(--card-border);box-shadow:none">🔒 Local PDF (Regex)</button>
-      <button class="btn-primary" id="btn-mode-manual" onclick="setUploadMode('manual')" style="background:var(--card-bg);color:var(--text);border:1px solid var(--card-border);box-shadow:none">✍️ Manual AI Paste</button>
-    </div>
+    <!-- Step Cards -->
+    <div style="display:grid;gap:14px">
 
-    <div class="card" style="padding:24px" id="upload-zone-wrapper">
-      <!-- File Drop (Used for Groq & Local) -->
-      <div id="file-drop-area">
-        <input type="file" id="file-input" accept="application/pdf,image/*" style="display:none" onchange="handleFileSelect(event)">
-        <label for="file-input" class="drop-zone" id="drop-zone">
-          <i class="fa-solid fa-cloud-arrow-up" style="font-size:2.5rem;color:var(--sky);margin-bottom:12px"></i>
-          <h3 style="font-size:1.1rem;font-weight:800;margin-bottom:4px">Click or Drag Bill Here</h3>
-          <p style="font-size:12px;color:var(--text-muted);font-weight:600" id="upload-hint">PDF or Image</p>
-        </label>
-        
-        <div id="processing-state" style="display:none;text-align:center;padding:30px 0">
-          <i class="fa-solid fa-spinner fa-spin" style="font-size:2rem;color:var(--sky);margin-bottom:12px"></i>
-          <h4 style="font-weight:800;font-size:14px" id="proc-title">Analysing...</h4>
-          <p style="font-size:12px;color:var(--text-muted)" id="proc-sub">Please wait</p>
+      <!-- STEP 1 — Copy Prompt -->
+      <div class="card" style="padding:20px;border-left:4px solid var(--sky)">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <div class="step-num">1</div>
+          <div>
+            <h3 style="font-weight:800;font-size:.95rem">Copy this prompt</h3>
+            <p style="font-size:11px;color:var(--muted);font-weight:600">This prompt tells the AI exactly what data to extract from your bill</p>
+          </div>
+          <button class="bprimary" style="margin-left:auto;flex-shrink:0" onclick="copyPrompt()" id="copy-btn">
+            <i class="fa-regular fa-copy"></i> Copy Prompt
+          </button>
+        </div>
+        <div class="prompt-box" id="prompt-display" onclick="this.select?.()"></div>
+      </div>
+
+      <!-- STEP 2 — Go to AI -->
+      <div class="card" style="padding:18px;border-left:4px solid var(--volt)">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px">
+          <div class="step-num" style="background:linear-gradient(135deg,var(--volt),#f97316)">2</div>
+          <div>
+            <h3 style="font-weight:800;font-size:.95rem">Open any AI assistant & upload your bill</h3>
+            <p style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:10px">Upload your bill PDF or photo, paste the prompt, and send it</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <a class="ai-chip" href="https://chat.openai.com" target="_blank"><img src="https://www.google.com/s2/favicons?domain=openai.com&sz=16" width="14" height="14"> ChatGPT</a>
+              <a class="ai-chip" href="https://gemini.google.com" target="_blank"><img src="https://www.google.com/s2/favicons?domain=gemini.google.com&sz=16" width="14" height="14"> Gemini</a>
+              <a class="ai-chip" href="https://grok.com" target="_blank"><img src="https://www.google.com/s2/favicons?domain=x.ai&sz=16" width="14" height="14"> Grok</a>
+              <a class="ai-chip" href="https://claude.ai" target="_blank"><img src="https://www.google.com/s2/favicons?domain=claude.ai&sz=16" width="14" height="14"> Claude</a>
+              <a class="ai-chip" href="https://copilot.microsoft.com" target="_blank"><img src="https://www.google.com/s2/favicons?domain=copilot.microsoft.com&sz=16" width="14" height="14"> Copilot</a>
+            </div>
+          </div>
+        </div>
+        <div style="background:rgba(234,179,8,.07);border:1px solid rgba(234,179,8,.25);border-radius:10px;padding:10px 12px">
+          <p style="font-size:11px;font-weight:700;color:var(--volt-d)">💡 <b>Tip:</b> Upload the PDF directly — don't copy-paste bill text. AI reads PDFs + images better than text dumps. Most free tiers allow PDF uploads.</p>
         </div>
       </div>
 
-      <!-- Manual Prompt Area -->
-      <div id="manual-prompt-area" style="display:none">
-        <p style="font-size:12px;font-weight:600;margin-bottom:8px">Paste this prompt into ChatGPT/Gemini:</p>
-        <textarea readonly style="width:100%;height:100px;font-size:10px;margin-bottom:12px;font-family:monospace" class="mono" onclick="this.select()">Extract SBPDCL bill to ONLY valid JSON: { "bill_month": "MAY-2026", "account_number": "123", "total_units_consumed": 0, "fixed_charge_demand_charge": 0, "energy_charge": 0, "state_subsidy_free_units": 0, "current_bill_amount": 0, "solar_current_month_balance": 0, "power_factor": 0.95, "current_reading": 0, "previous_reading": 0 }</textarea>
-        <p style="font-size:12px;font-weight:600;margin-bottom:8px">Paste JSON Response here:</p>
-        <textarea id="manual-json-input" style="width:100%;height:140px;font-family:monospace;font-size:11px" placeholder="{ ... }"></textarea>
-        <button class="btn-primary" style="width:100%;margin-top:12px;justify-content:center" onclick="processManualJSON()">Process JSON</button>
+      <!-- STEP 3 — Paste Response -->
+      <div class="card" style="padding:20px;border-left:4px solid var(--em)">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <div class="step-num" style="background:linear-gradient(135deg,var(--em),#059669)">3</div>
+          <div>
+            <h3 style="font-weight:800;font-size:.95rem">Paste the AI's response here</h3>
+            <p style="font-size:11px;color:var(--muted);font-weight:600">The AI will reply with a JSON block — paste the entire response below</p>
+          </div>
+        </div>
+        <textarea id="paste-area" style="width:100%;height:160px;font-family:'JetBrains Mono',monospace;font-size:11px;padding:12px;border-radius:10px;border:1.5px solid var(--border);background:var(--s50);color:var(--txt);resize:vertical;outline:none;line-height:1.6" placeholder='Paste the AI response here... It will look like:
+{
+  "bill_month": "MAY-2026",
+  "account_number": "100604522",
+  "total_units_consumed": 1088,
+  ...
+}'></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="bprimary" onclick="parseAndPreview()" style="flex:1;justify-content:center"><i class="fa-solid fa-wand-magic-sparkles"></i> Parse & Preview</button>
+          <button class="bghost" onclick="document.getElementById('paste-area').value=''">Clear</button>
+        </div>
+        <div id="parse-error" style="display:none;margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);color:var(--rose);font-size:12px;font-weight:700"></div>
       </div>
-    </div>
 
-    <!-- Preview Results -->
-    <div id="bill-preview" style="display:none;margin-top:20px" class="card">
-      <div style="padding:16px 20px;border-bottom:1px solid var(--card-border);background:rgba(16,185,129,.05)">
-        <h3 style="font-weight:800;color:var(--emerald)"><i class="fa-solid fa-check"></i> Bill Extracted successfully</h3>
+      <!-- PREVIEW (hidden until parsed) -->
+      <div id="preview-card" class="card" style="display:none;border:2px solid var(--em)">
+        <div style="padding:14px 18px;background:rgba(16,185,129,.07);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div>
+            <h3 style="font-weight:800;color:var(--em)"><i class="fa-solid fa-circle-check"></i> Bill data extracted!</h3>
+            <p style="font-size:11px;color:var(--muted);font-weight:600" id="preview-subtitle">Review before saving</p>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="bghost" onclick="cancelPreview()">Cancel</button>
+            <button class="bprimary" onclick="saveBill()"><i class="fa-solid fa-floppy-disk"></i> Save Bill</button>
+          </div>
+        </div>
+        <div style="padding:16px 18px">
+          <!-- Key fields -->
+          <div id="preview-key" class="grid4" style="gap:10px;margin-bottom:14px"></div>
+          <!-- History import offer -->
+          <div id="history-import-banner" style="display:none;padding:12px 14px;background:rgba(14,165,233,.07);border:1px solid rgba(14,165,233,.2);border-radius:10px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+              <div>
+                <p style="font-size:12px;font-weight:800;color:var(--sky)">📊 Historical data found in this bill!</p>
+                <p style="font-size:11px;color:var(--muted);font-weight:600" id="hist-import-msg">This bill contains last 11 months of consumption data. Import them?</p>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button class="bghost" style="font-size:11px" onclick="document.getElementById('history-import-banner').style.display='none'">Skip</button>
+                <button class="bprimary" style="font-size:11px" onclick="importHistoryData()"><i class="fa-solid fa-cloud-arrow-down"></i> Import History</button>
+              </div>
+            </div>
+          </div>
+          <!-- All fields grid -->
+          <div class="sec">All Extracted Fields</div>
+          <div id="preview-all" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px"></div>
+        </div>
       </div>
-      <div style="padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:12px" id="preview-grid"></div>
-      <div style="padding:16px 20px;border-top:1px solid var(--card-border);display:flex;justify-content:flex-end;gap:10px">
-        <button class="btn-ghost" onclick="resetUpload()">Cancel</button>
-        <button class="btn-primary" onclick="saveExtractedBill()"><i class="fa-solid fa-floppy-disk"></i> Save Bill</button>
-      </div>
+
+    </div><!-- /grid -->
+
+    <!-- Manual Entry link -->
+    <div style="text-align:center;margin-top:16px">
+      <button class="bghost" onclick="openModal('manual-modal')" style="font-size:12px"><i class="fa-solid fa-keyboard"></i> Enter data manually instead</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════
-     ANALYTICS
-═══════════════════════════════════════════ -->
-<div id="tab-analytics" class="tab-content">
-  <div style="display:grid;gap:16px">
-    
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <div class="chart-wrap">
-        <div class="chart-title">📊 YoY Consumption (Current vs Prev Year)</div>
-        <canvas id="chart-yoy" style="max-height:260px"></canvas>
-      </div>
-      <div class="chart-wrap">
-        <div class="chart-title">💸 Cost Breakdown Trend</div>
-        <canvas id="chart-cost-stack" style="max-height:260px"></canvas>
-      </div>
+<!-- ══════════════════ ANALYTICS ══════════════════ -->
+<div id="tab-analytics" class="tab">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <h2 style="font-size:1.2rem;font-weight:900">📊 Analytics</h2>
+    <div style="display:flex;gap:6px">
+      <button class="pill psky" style="cursor:pointer;border:1px solid rgba(14,165,233,.3)" onclick="setPeriod(6)" id="p6">6M</button>
+      <button class="pill" style="cursor:pointer;border:1px solid var(--border);background:var(--card)" onclick="setPeriod(12)" id="p12">12M</button>
+      <button class="pill" style="cursor:pointer;border:1px solid var(--border);background:var(--card)" onclick="setPeriod(99)" id="p99">All</button>
     </div>
-
-    <div class="chart-wrap">
-      <div class="chart-title">📈 Absolute Meter Readings <span style="font-size:10px;font-weight:600;color:var(--text-muted)">(Consumption & Solar)</span></div>
-      <canvas id="chart-readings" style="max-height:220px"></canvas>
+  </div>
+  <div>
+    <div class="chart-wrap"><div class="ctitle">⚡ Units Consumed per Month <span class="pill psky" id="avg-badge">avg: —</span></div><canvas id="c-units" style="max-height:250px"></canvas></div>
+    <div class="grid2">
+      <div class="chart-wrap"><div class="ctitle">💸 Bill Amount (₹) Trend</div><canvas id="c-amt" style="max-height:220px"></canvas></div>
+      <div class="chart-wrap"><div class="ctitle">🧾 Latest Bill Charges Breakdown</div><canvas id="c-break" style="max-height:220px"></canvas></div>
     </div>
-
+    <div class="chart-wrap"><div class="ctitle">📅 Year-over-Year Comparison <span style="font-size:10px;font-weight:600;color:var(--muted)" id="yoy-label"></span></div><canvas id="c-yoy" style="max-height:240px"></canvas></div>
+    <div class="grid2">
+      <div class="chart-wrap"><div class="ctitle">☀️ Solar Balance vs Grid Units</div><canvas id="c-solar-grid" style="max-height:220px"></canvas></div>
+      <div class="chart-wrap"><div class="ctitle">⚙️ Power Factor Trend <span class="pill" style="background:rgba(16,185,129,.1);color:var(--em)">Target ≥ 0.95</span></div><canvas id="c-pf" style="max-height:220px"></canvas></div>
+    </div>
+    <!-- Tariff Calculator -->
+    <div class="card" style="padding:18px;margin-top:4px">
+      <div class="sec">💡 Tariff Slab Calculator — What-If Analysis</div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <label style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted)">Adjust Units (what if I used...)</label>
+          <input type="range" id="calc-units" min="0" max="2000" value="500" step="10" oninput="runCalc()" style="width:100%;margin-top:6px;accent-color:var(--sky)">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);font-weight:700"><span>0</span><span id="calc-unit-val" style="color:var(--sky)">500</span><span>2000</span></div>
+        </div>
+        <div class="grid3" style="flex:2;gap:10px;min-width:200px">
+          <div style="text-align:center;padding:12px;background:var(--s50);border-radius:10px;border:1px solid var(--border)">
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted)">Est. Energy</div>
+            <div class="mono" style="font-size:1.1rem;font-weight:700;color:var(--sky)" id="calc-energy">₹0</div>
+          </div>
+          <div style="text-align:center;padding:12px;background:var(--s50);border-radius:10px;border:1px solid var(--border)">
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted)">Fixed Charge</div>
+            <div class="mono" style="font-size:1.1rem;font-weight:700;color:var(--vi)" id="calc-fixed">₹0</div>
+          </div>
+          <div style="text-align:center;padding:12px;background:var(--s50);border-radius:10px;border:1px solid var(--border)">
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted)">Total Est.</div>
+            <div class="mono" style="font-size:1.1rem;font-weight:700;color:var(--em)" id="calc-total">₹0</div>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:10px;color:var(--muted);font-weight:600;margin-top:8px">* Estimate based on tariff config in Settings. Doesn't account for subsidies.</p>
+    </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════
-     HISTORY
-═══════════════════════════════════════════ -->
-<div id="tab-history" class="tab-content">
+<!-- ══════════════════ HISTORY ══════════════════ -->
+<div id="tab-history" class="tab">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <h2 style="font-size:1.2rem;font-weight:900">📋 Bill History</h2>
+    <div style="display:flex;gap:8px">
+      <button class="bghost" onclick="exportCSV()"><i class="fa-solid fa-download"></i> Export CSV</button>
+      <button class="bprimary" onclick="sw('addbill')"><i class="fa-solid fa-plus"></i> Add Bill</button>
+    </div>
+  </div>
   <div class="card" style="overflow-x:auto">
     <table class="bill-table">
-      <thead>
-        <tr>
-          <th>Account</th>
-          <th>Month</th>
-          <th>Units</th>
-          <th>Reading</th>
-          <th>Net Amt</th>
-          <th>Solar</th>
-          <th>PF</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody id="history-body"></tbody>
+      <thead><tr>
+        <th>Month</th><th>Account</th><th>Units</th><th>Reading</th><th>Bill Days</th>
+        <th>Fixed</th><th>Energy</th><th>Subsidy</th><th>Net Bill</th>
+        <th>Solar</th><th>PF</th><th>Due Date</th><th>Prev Paid</th><th>Actions</th>
+      </tr></thead>
+      <tbody id="hist-body"></tbody>
     </table>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════
-     SETTINGS
-═══════════════════════════════════════════ -->
-<div id="tab-settings" class="tab-content">
-  <div style="max-width:600px;margin:0 auto">
-    
-    <div class="sec-title">Accounts Management</div>
-    <div class="card" style="padding:20px;margin-bottom:20px">
-      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Manage multiple properties/meters.</p>
-      <div id="accounts-list" style="margin-bottom:12px;display:grid;gap:8px"></div>
-      <div style="display:flex;gap:8px">
-        <input type="text" id="new-acc-ca" placeholder="CA Number" style="flex:1" class="field" style="margin:0">
-        <input type="text" id="new-acc-name" placeholder="Alias (e.g. Home)" style="flex:1" class="field" style="margin:0">
-        <button class="btn-primary" onclick="addAccount()">Add</button>
+<!-- ══════════════════ SOLAR ══════════════════ -->
+<div id="tab-solar" class="tab">
+  <h2 style="font-size:1.2rem;font-weight:900;margin-bottom:16px">☀️ Solar Net Metering Tracker</h2>
+  <div class="grid4" style="margin-bottom:18px">
+    <div class="scard sc2"><div class="lbl">Current Balance</div><div class="val" id="sol-cur">—</div><div class="sub">units banked</div><div class="bg">☀️</div></div>
+    <div class="scard sc3"><div class="lbl">Est. Monthly Save</div><div class="val" id="sol-save">—</div><div class="sub">₹ per month</div><div class="bg">💰</div></div>
+    <div class="scard sc1"><div class="lbl">Peak Month</div><div class="val" id="sol-peak">—</div><div class="sub" id="sol-peak-mo">units</div><div class="bg">🏆</div></div>
+    <div class="scard sc5"><div class="lbl">Avg Supply</div><div class="val" id="sol-hrs">—</div><div class="sub">hours/day</div><div class="bg">⏱️</div></div>
+  </div>
+  <div class="grid2">
+    <div class="chart-wrap"><div class="ctitle">☀️ Solar Balance Trend</div><canvas id="c-solar" style="max-height:240px"></canvas></div>
+    <div class="chart-wrap"><div class="ctitle">📊 Solar vs Total Consumption</div><canvas id="c-solar-pct" style="max-height:240px"></canvas></div>
+  </div>
+  <div class="sec">Solar Insights</div>
+  <div id="solar-insights" style="display:grid;gap:10px"></div>
+</div>
+
+<!-- ══════════════════ SETTINGS ══════════════════ -->
+<div id="tab-settings" class="tab">
+  <div style="max-width:640px;margin:0 auto">
+
+    <!-- Accounts -->
+    <div class="sec">Manage Consumer Accounts</div>
+    <div class="card" style="padding:18px;margin-bottom:18px">
+      <p style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:12px">Track multiple meters / properties independently. Bills are stored per account.</p>
+      <div id="acc-list" style="display:grid;gap:8px;margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="text" id="new-ca" placeholder="CA Number (e.g. 100604522)" style="flex:1;min-width:120px;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--s50);color:var(--txt);font-size:12px;font-weight:600;outline:none;font-family:inherit">
+        <input type="text" id="new-alias" placeholder="Alias (e.g. Home / Shop)" style="flex:1;min-width:120px;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--s50);color:var(--txt);font-size:12px;font-weight:600;outline:none;font-family:inherit">
+        <button class="bprimary" onclick="addAccount()">+ Add</button>
       </div>
     </div>
 
-    <div class="sec-title">AI & Extraction (BYOK)</div>
-    <div class="card" style="padding:20px;margin-bottom:20px;border-color:var(--rose-d)">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <i class="fa-solid fa-brain" style="color:var(--rose)"></i>
-        <h4 style="font-weight:800">Groq API Key (Optional)</h4>
+    <!-- Tariff Config -->
+    <div class="sec">Tariff Configuration (SBPDCL Domestic)</div>
+    <div class="card" style="padding:18px;margin-bottom:18px">
+      <p style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:12px">Used for slab analysis and the What-If calculator. Update if SBPDCL revises tariffs.</p>
+      <div class="grid2" style="gap:10px">
+        <div class="ifield"><label>Slab 1 Limit (Units)</label><input type="number" id="s-slab1" value="100"></div>
+        <div class="ifield"><label>Slab 1 Rate (₹/unit)</label><input type="number" id="s-rate1" value="6.10" step="0.01"></div>
+        <div class="ifield"><label>Slab 2 Rate (₹/unit)</label><input type="number" id="s-rate2" value="6.95" step="0.01"></div>
+        <div class="ifield"><label>Fixed Charge (₹/kW/month)</label><input type="number" id="s-fixed" value="40"></div>
+        <div class="ifield"><label>Per Unit Rate (₹, for solar calc)</label><input type="number" id="s-rate" value="7.30" step="0.01"></div>
       </div>
-      <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">Add a free Groq API key to enable lightning-fast auto-extraction of PDFs and Images. Without it, the app falls back to local PDF Regex parsing.</p>
-      <div class="field">
-        <input type="password" id="set-groq" placeholder="gsk_xxxxxxxxxxxxxxxxxxxxx">
-      </div>
-      <button class="btn-ghost" onclick="saveSettings()">Save Key</button>
+      <button class="bprimary" onclick="saveSettings()"><i class="fa-solid fa-floppy-disk"></i> Save Settings</button>
     </div>
 
-    <div class="sec-title">Tariff Configuration</div>
-    <div class="card" style="padding:20px">
-      <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">Used for the Slab Analyzer. (Default SBPDCL Domestic ~₹6.10 / ₹6.95)</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Slab 1 Limit (Units)</label><input type="number" id="set-slab1" value="100"></div>
-        <div class="field"><label>Slab 1 Rate (₹)</label><input type="number" id="set-rate1" value="6.10" step="0.01"></div>
-        <div class="field"><label>Slab 2 Rate (₹)</label><input type="number" id="set-rate2" value="6.95" step="0.01"></div>
-        <div class="field"><label>Fixed Charge (₹/kW)</label><input type="number" id="set-fixed" value="40"></div>
+    <!-- GitHub Gist Sync -->
+    <div class="sec">GitHub Gist Sync (Free Cloud Backup)</div>
+    <div class="card" style="padding:18px;margin-bottom:18px">
+      <p style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:12px;line-height:1.7">
+        Sync across devices for free using your GitHub account.<br>
+        <b>Setup:</b> github.com → Settings → Developer Settings → Personal Access Tokens (classic) → New token → tick <b>gist</b> scope → Generate → Copy
+      </p>
+      <div class="ifield"><label>GitHub Personal Access Token</label><input type="password" id="s-ghtoken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"></div>
+      <div class="ifield"><label>Gist ID <span style="text-transform:none;font-weight:500">(blank = auto-create on first push)</span></label><input type="text" id="s-gistid" placeholder="Auto-filled after first sync"></div>
+      <div id="gist-msg" style="display:none;margin-bottom:10px;padding:9px 12px;border-radius:10px;font-size:12px;font-weight:700"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="bprimary" onclick="saveGistConfig()"><i class="fa-brands fa-github"></i> Save & Test</button>
+        <button class="bghost" onclick="gistPush(true)"><i class="fa-solid fa-cloud-arrow-up"></i> Push</button>
+        <button class="bghost" onclick="gistPull()"><i class="fa-solid fa-cloud-arrow-down"></i> Pull</button>
       </div>
-      <button class="btn-primary" onclick="saveSettings()" style="margin-top:10px">Save Settings</button>
+    </div>
+
+    <!-- Data Management -->
+    <div class="sec">Data Management</div>
+    <div class="card" style="padding:18px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="bghost" onclick="exportJSON()"><i class="fa-solid fa-download"></i> Backup JSON</button>
+        <label class="bghost" style="cursor:pointer"><i class="fa-solid fa-upload"></i> Restore JSON<input type="file" accept=".json" style="display:none" onchange="importJSON(this)"></label>
+        <button class="bghost" onclick="exportCSV()"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+        <button class="bghost" onclick="clearData()" style="color:var(--rose);border-color:rgba(244,63,94,.3)"><i class="fa-solid fa-trash"></i> Clear All Data</button>
+      </div>
     </div>
 
   </div>
 </div>
-
 </main>
 
+<!-- ══════════════════ MODALS ══════════════════ -->
+
+<!-- Manual Entry Modal -->
+<div id="manual-modal" class="modal-ov" style="display:none">
+  <div class="modal-box">
+    <div class="m-hdr"><h3>✍️ Manual Bill Entry</h3><button class="bghost" style="padding:4px 8px" onclick="closeModal('manual-modal')"><i class="fa-solid fa-times"></i></button></div>
+    <div class="m-body">
+      <div class="grid2" style="gap:10px">
+        <div class="ifield"><label>Bill Month</label><input type="text" id="m-mo" placeholder="MAY-2026"></div>
+        <div class="ifield"><label>Account / CA Number</label><input type="text" id="m-ca" placeholder="100604522"></div>
+        <div class="ifield"><label>Consumer Name</label><input type="text" id="m-name" placeholder="SMT. KANTI KUMARI"></div>
+        <div class="ifield"><label>Consumer Category</label><input type="text" id="m-cat" placeholder="DS-IID"></div>
+        <div class="ifield"><label>Total Units Consumed</label><input type="number" id="m-units" placeholder="1088"></div>
+        <div class="ifield"><label>Bill Days</label><input type="number" id="m-days" placeholder="30"></div>
+        <div class="ifield"><label>Current Reading (Phase 1)</label><input type="number" id="m-cr1" placeholder="15848"></div>
+        <div class="ifield"><label>Previous Reading (Phase 1)</label><input type="number" id="m-pr1" placeholder="14861"></div>
+        <div class="ifield"><label>Reading Date (Current)</label><input type="text" id="m-rdate" placeholder="01.05.26"></div>
+        <div class="ifield"><label>Fixed / Demand Charge (₹)</label><input type="number" id="m-fixed" placeholder="720"></div>
+        <div class="ifield"><label>Energy Charge (₹)</label><input type="number" id="m-energy" placeholder="0"></div>
+        <div class="ifield"><label>State Subsidy (₹)</label><input type="number" id="m-subsidy" placeholder="-720"></div>
+        <div class="ifield"><label>Net Bill Amount (₹)</label><input type="number" id="m-net" placeholder="0"></div>
+        <div class="ifield"><label>Total Due (₹)</label><input type="number" id="m-due" placeholder="-34"></div>
+        <div class="ifield"><label>Due Date</label><input type="text" id="m-duedate" placeholder="06.06.2026"></div>
+        <div class="ifield"><label>Power Factor</label><input type="number" id="m-pf" placeholder="0.94" step="0.01"></div>
+        <div class="ifield"><label>Solar Balance (Units)</label><input type="number" id="m-solar" placeholder="520"></div>
+        <div class="ifield"><label>Previous Payment (₹)</label><input type="number" id="m-pp" placeholder="3607"></div>
+      </div>
+    </div>
+    <div class="m-ftr">
+      <button class="bghost" onclick="closeModal('manual-modal')">Cancel</button>
+      <button class="bprimary" onclick="saveManual()"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bill Detail Modal -->
+<div id="detail-modal" class="modal-ov" style="display:none">
+  <div class="modal-box" style="max-width:660px">
+    <div class="m-hdr"><h3 id="detail-title">Bill Details</h3><button class="bghost" style="padding:4px 8px" onclick="closeModal('detail-modal')"><i class="fa-solid fa-times"></i></button></div>
+    <div class="m-body" id="detail-body"></div>
+    <div class="m-ftr"><button class="bghost" onclick="closeModal('detail-modal')">Close</button></div>
+  </div>
+</div>
+
 <script>
-/* ════════════════════════════════════════════════════
-   STATE & INITIALIZATION
-════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════
+//  THE COMPREHENSIVE AI PROMPT
+// ═══════════════════════════════════════════════════
+const PROMPT = `SBPDCL ELECTRICITY BILL — COMPLETE DATA EXTRACTION
+
+You are reading an SBPDCL (South Bihar Power Distribution Company Limited) electricity bill from Bihar, India.
+The bill contains Hindi text (Devanagari script or phonetic romanisation like "ibala maah", "Kaataa saMKyaa") mixed with English.
+
+YOUR TASK: Extract EVERY piece of data from this bill.
+Output ONLY a JSON object — no explanation, no text before/after, no markdown code fences.
+Start directly with { and end with }. Nothing else.
+
+FIELD REFERENCE (Hindi keyword → English field name → example value):
+• बिल माह / ibala maah           → bill_month              → "MAY-2026"
+• दिनांक / dinaMk (bill date)    → bill_date               → "22.05.2026"
+• बिल संख्या                      → bill_number             → "10214141378"
+• खाता संख्या / Kaataa saMKyaa   → account_number          → "100604522"
+• कंज्यूमर आईडी                   → consumer_id             → "010102487509"
+• एम.आर.यू. संख्या                → mru_number              → "AAFASMF8"
+• नाम पता / naama                  → consumer_name           → "SMT. KANTI KUMARI"
+• पूरा पता                         → address                 → "KANKARBAGH2, PATNA 800020"
+• मोबाइल / Mobile                  → mobile                  → "920XXXX540"
+• उपभोक्ता श्रेणी                   → consumer_category       → "DS-IID"
+• मीटर फेज / mITr foja            → meter_phase             → "THREE PHASE"
+• एरिया टाइप                       → area_type               → "URBAN"
+• विद्युत कनेक्शन की तिथि          → connection_date         → "21.11.2012"
+• प्रमंडल/कोड                      → division                → "RAMKRISHNA NAGAR/AAF"
+• अवर प्रमंडल/कोड                  → sub_division            → "GOPALPUR/AAFA"
+• प्रशाखा/कोड                      → section                 → "Sec-Gopalpur/AAFAA"
+• फीडर का नाम/कोड                  → feeder_code             → "/RKR"
+• रूट/पोल कोड                      → route_pole_code         → "235/"
+• स्वीकृत भार/संविदा मांग           → sanctioned_load_kw      → 11.00
+• अभिलिखित डिमांड                  → recorded_demand_kw      → 6.82
+• मीटर संख्या / GL number          → meter_number            → "GL8279362"
+• मीटर ओनर                        → meter_owner             → "COMPANY"
+• बिल का आधार                     → bill_basis              → "ACTUAL"
+• वर्तमान पठन दिनांक               → current_reading_date    → "01.05.26"
+• पूर्व पठन दिनांक                  → previous_reading_date   → "02.04.26"
+• वर्तमान पठन Phase 1              → current_reading_ph1     → 15848
+• पूर्व पठन Phase 1                → previous_reading_ph1    → 14861
+• खपत / अंतर Phase 1               → units_ph1               → 987
+• वर्तमान पठन Phase 2 (if 3-phase) → current_reading_ph2     → 11036
+• पूर्व पठन Phase 2                → previous_reading_ph2    → 10935
+• खपत Phase 2                     → units_ph2               → 101
+• कुल खपत (all phases combined)    → total_units_consumed    → 1088
+• गुणांक / Multiplying Factor      → multiplying_factor      → 1
+• पावर फैक्टर                      → power_factor            → 0.94
+• कुल बिल दिवस                    → bill_days               → 30
+• घोषित यूनिट्स (free units)       → free_units_ghoshit      → 0
+• अनुदानित यूनिट                   → subsidised_units        → 0
+
+PREVIOUS BALANCE SECTION (बकाया विवरणी):
+• अग्रिम जमा                      → advance_deposit_balance → 0.00
+• ऊर्जा बकाया                     → energy_balance          → -0.33
+• विलम्ब अधिभार बकाया             → late_fee_balance        → 0.00
+• अन्य प्रभार (बकाया)             → other_prev_charges      → -33.93
+• कुल बकाया 'A'                   → total_previous_balance  → -34.26
+
+CURRENT BILL CHARGES (वर्तमान विपत्र का विवरण):
+• ऊर्जा शुल्क                     → energy_charge           → 0.00
+• फिक्सड/डिमांड चार्ज             → fixed_charge            → 720.00
+• आधिक्य डिमांड प्रभार            → excess_demand_charge    → 0.00
+• विद्युत शुल्क                   → electricity_duty        → 0.00
+• कैपिसिटर प्रभार                 → capacitor_charge        → 0.00
+• अन्य शुल्क (current)            → other_charges           → 0.00
+• उप जोड़ (subtotal)              → subtotal                → 720.00
+• राज्य सरकार अनुदान (निःशुल्क)  → subsidy_free_units      → -720.00
+• राज्य सरकार अनुदान (अनुदानित)  → subsidy_subsidised      → 0.00
+• वर्तमान विपत्र राशि             → current_bill_amount     → 0.00
+
+OTHER CHARGES:
+• वर्तमान माह का विलम्ब अधिभार   → late_payment_surcharge  → 0.00
+• रीमिशन                         → remission               → 0.00
+• कुल मांग                       → total_demand            → -34.26
+• जमानत राशि पर सूद              → security_deposit_int    → 0.00
+• छूट की राशि                    → concession_amount       → 0.00
+
+DUE DATES:
+• दय तिथि                        → due_date                → "06.06.2026"
+• दय तिथि तक कुल राशि            → amount_due_by_date      → -34.00
+• +10 दिन तक देय                  → amount_due_plus10       → -34.00
+
+PREVIOUS PAYMENT (पिछले भुगतान का विवरण):
+• पिछले भुगतान की राशि           → prev_payment_amount     → 3607.00
+• दिनांक                         → prev_payment_date       → "01.04.2026"
+• रसीद संख्या                     → prev_payment_receipt    → "SBPS1000335546452"
+• जमानत की जमा राशि              → security_deposit_amt    → 1000.00
+
+SOLAR & SUPPLY:
+• वर्तमान माह का शेष यूनिट        → solar_current_balance   → 520
+• पूर्व माह का शेष यूनिट          → solar_prev_balance      → 1.406
+• औसत आपूर्ति घंटे               → avg_supply_hours        → 23.25
+
+LAST 11 MONTHS TABLE (पिछले 11 माह का खपत):
+Extract the consumption history table. Use "MON-YY" format for keys. Example:
+  "history_consumption": {"APR-26":0,"MAR-26":610,"FEB-26":1017,"JAN-26":597,"DEC-25":0,"NOV-25":138,"OCT-25":350,"SEP-25":749,"JUL-25":546,"JUN-25":660,"MAY-25":0}
+
+RETURN THIS EXACT JSON (fill all fields, use 0 for missing numbers, "" for missing strings, negative for credits):
+
+{
+  "bill_month": "",
+  "bill_date": "",
+  "bill_number": "",
+  "account_number": "",
+  "consumer_id": "",
+  "mru_number": "",
+  "consumer_name": "",
+  "address": "",
+  "mobile": "",
+  "consumer_category": "",
+  "meter_phase": "",
+  "area_type": "",
+  "connection_date": "",
+  "division": "",
+  "sub_division": "",
+  "section": "",
+  "feeder_code": "",
+  "route_pole_code": "",
+  "sanctioned_load_kw": 0,
+  "recorded_demand_kw": 0,
+  "meter_number": "",
+  "meter_owner": "",
+  "bill_basis": "",
+  "current_reading_date": "",
+  "previous_reading_date": "",
+  "current_reading_ph1": 0,
+  "previous_reading_ph1": 0,
+  "units_ph1": 0,
+  "current_reading_ph2": 0,
+  "previous_reading_ph2": 0,
+  "units_ph2": 0,
+  "total_units_consumed": 0,
+  "multiplying_factor": 1,
+  "power_factor": 0,
+  "bill_days": 0,
+  "free_units_ghoshit": 0,
+  "subsidised_units": 0,
+  "advance_deposit_balance": 0,
+  "energy_balance": 0,
+  "late_fee_balance": 0,
+  "other_prev_charges": 0,
+  "total_previous_balance": 0,
+  "energy_charge": 0,
+  "fixed_charge": 0,
+  "excess_demand_charge": 0,
+  "electricity_duty": 0,
+  "capacitor_charge": 0,
+  "other_charges": 0,
+  "subtotal": 0,
+  "subsidy_free_units": 0,
+  "subsidy_subsidised": 0,
+  "current_bill_amount": 0,
+  "late_payment_surcharge": 0,
+  "remission": 0,
+  "total_demand": 0,
+  "security_deposit_int": 0,
+  "concession_amount": 0,
+  "due_date": "",
+  "amount_due_by_date": 0,
+  "amount_due_plus10": 0,
+  "prev_payment_amount": 0,
+  "prev_payment_date": "",
+  "prev_payment_receipt": "",
+  "security_deposit_amt": 0,
+  "solar_current_balance": 0,
+  "solar_prev_balance": 0,
+  "avg_supply_hours": 0,
+  "history_consumption": {},
+  "is_zero_bill": false,
+  "notes": ""
+}`;
+
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
 let bills = [];
-let settings = {
-  accounts: [],
-  groqKey: '',
-  slab1: 100, rate1: 6.10, rate2: 6.95, fixed: 40,
-  dark: false
-};
+let settings = { accounts:[], slab1:100, rate1:6.10, rate2:6.95, fixed:40, rate:7.30, dark:false };
 let currentAcc = 'ALL';
-let uploadMode = 'local';
-let extractedTemp = null;
+let period = 6;
 let charts = {};
+let parsedTemp = null;
+let toastTimer;
 
+const SK = 'bt3_bills', SS = 'bt3_settings';
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
 function init() {
-  const b = localStorage.getItem('bt_bills');
-  if (b) bills = JSON.parse(b);
-  const s = localStorage.getItem('bt_settings');
-  if (s) settings = { ...settings, ...JSON.parse(s) };
-
-  // Auto-infer accounts if missing
-  const uniqueCAs = [...new Set(bills.map(x => x.account_number).filter(Boolean))];
-  uniqueCAs.forEach(ca => {
-    if(!settings.accounts.find(a => a.ca === ca)) settings.accounts.push({ca, name: `Meter ${ca.slice(-4)}`});
-  });
-
-  if(settings.dark) { document.documentElement.classList.add('dark'); document.getElementById('theme-icon').className = 'fa-solid fa-sun'; }
-  if(settings.groqKey) uploadMode = 'ai';
-
+  try { const d = localStorage.getItem(SK); if(d) bills = JSON.parse(d); } catch(e){}
+  try { const s = localStorage.getItem(SS); if(s) settings = {...settings, ...JSON.parse(s)}; } catch(e){}
+  autoDiscoverAccounts();
+  if(settings.dark) { document.documentElement.classList.add('dark'); document.getElementById('ti').className = 'fa-solid fa-sun'; }
+  document.getElementById('prompt-display').textContent = PROMPT;
+  loadSettingsUI();
   updateAccSwitcher();
-  setUploadMode(uploadMode);
   renderAll();
-  
-  // Fill settings UI
-  document.getElementById('set-groq').value = settings.groqKey || '';
-  ['slab1','rate1','rate2','fixed'].forEach(k => document.getElementById('set-'+k).value = settings[k]);
-  renderSettingsAccounts();
+  // Try gist pull on startup
+  const tok = localStorage.getItem('gh_tok'), gid = localStorage.getItem('gh_gid');
+  if(tok && gid) gistPull(true);
+}
+
+function autoDiscoverAccounts() {
+  bills.forEach(b => {
+    if(b.account_number && !settings.accounts.find(a => a.ca === b.account_number)) {
+      settings.accounts.push({ ca: b.account_number, alias: b.consumer_name ? b.consumer_name.split(' ').slice(-1)[0] : `Meter-${b.account_number.slice(-4)}` });
+    }
+  });
 }
 
 function saveLocal() {
-  localStorage.setItem('bt_bills', JSON.stringify(bills));
-  localStorage.setItem('bt_settings', JSON.stringify(settings));
+  localStorage.setItem(SK, JSON.stringify(bills));
+  localStorage.setItem(SS, JSON.stringify(settings));
+  gistPush(false);
+}
+function saveLocalOnly() {
+  localStorage.setItem(SK, JSON.stringify(bills));
+  localStorage.setItem(SS, JSON.stringify(settings));
 }
 
-function getActiveBills() {
-  let active = currentAcc === 'ALL' ? bills : bills.filter(b => b.account_number === currentAcc);
-  return active.sort((a,b) => sortMonth(a.bill_month) - sortMonth(b.bill_month));
-}
-
-function sortMonth(m) {
-  if(!m) return 0;
-  const mos = {JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
-  const [mo, yr] = m.split('-');
-  return (parseInt(yr||2026)*100) + (mos[mo?.toUpperCase()]||0);
-}
-
-// UI Nav
-function switchTab(t) {
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
-  document.getElementById('tab-'+t).classList.add('active');
-  if(t==='dashboard' || t==='analytics') setTimeout(renderAll, 50);
+// ═══════════════════════════════════════════════════
+//  ROUTING
+// ═══════════════════════════════════════════════════
+function sw(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+  document.getElementById('tab-'+id).classList.add('active');
+  if(id==='analytics') setTimeout(renderAnalytics, 50);
+  if(id==='solar') setTimeout(renderSolar, 50);
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 function toggleDark() {
   settings.dark = !settings.dark;
   document.documentElement.classList.toggle('dark', settings.dark);
-  document.getElementById('theme-icon').className = settings.dark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
-  saveLocal(); renderAll();
-}
-function toast(msg, isErr=false) {
-  const t = document.getElementById('toast');
-  document.getElementById('toast-msg').textContent = msg;
-  t.style.background = isErr ? 'var(--rose-d)' : (settings.dark ? 'var(--slate800)' : 'var(--slate900)');
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+  document.getElementById('ti').className = settings.dark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+  saveLocal(); setTimeout(renderAll, 100);
 }
 
-/* ════════════════════════════════════════════════════
-   MULTI-ACCOUNT LOGIC
-════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════
+//  ACCOUNTS
+// ═══════════════════════════════════════════════════
 function updateAccSwitcher() {
   const sel = document.getElementById('acc-select');
-  sel.innerHTML = `<option value="ALL">All Meters (${bills.length} bills)</option>` + 
-    settings.accounts.map(a => `<option value="${a.ca}">${a.name} (${a.ca})</option>`).join('');
+  const active = getActiveBills();
+  sel.innerHTML = `<option value="ALL">All Accounts (${bills.length})</option>` +
+    settings.accounts.map(a => `<option value="${a.ca}">${a.alias} — ${a.ca}</option>`).join('');
   sel.value = currentAcc;
+  renderAccList();
 }
-function changeAccount(ca) { currentAcc = ca; renderAll(); }
+function changeAccount(v) { currentAcc = v; renderAll(); }
 function addAccount() {
-  const ca = document.getElementById('new-acc-ca').value.trim();
-  const name = document.getElementById('new-acc-name').value.trim();
-  if(!ca) return toast('CA required', true);
-  if(!settings.accounts.find(a=>a.ca===ca)) settings.accounts.push({ca, name: name||'Meter'});
-  saveLocal(); updateAccSwitcher(); renderSettingsAccounts();
-  document.getElementById('new-acc-ca').value=''; document.getElementById('new-acc-name').value='';
+  const ca = document.getElementById('new-ca').value.trim();
+  const alias = document.getElementById('new-alias').value.trim() || `Meter-${ca.slice(-4)}`;
+  if(!ca) { toast('Enter CA number','err'); return; }
+  if(!settings.accounts.find(a => a.ca === ca)) settings.accounts.push({ ca, alias });
+  saveLocal(); updateAccSwitcher();
+  document.getElementById('new-ca').value = ''; document.getElementById('new-alias').value = '';
+  toast('Account added');
 }
 function delAccount(ca) {
+  if(!confirm('Remove this account? Bills are NOT deleted.')) return;
   settings.accounts = settings.accounts.filter(a => a.ca !== ca);
-  if(currentAcc === ca) { currentAcc = 'ALL'; updateAccSwitcher(); }
-  saveLocal(); renderSettingsAccounts(); updateAccSwitcher();
+  if(currentAcc === ca) currentAcc = 'ALL';
+  saveLocal(); updateAccSwitcher(); renderAll();
 }
-function renderSettingsAccounts() {
-  document.getElementById('accounts-list').innerHTML = settings.accounts.map(a => 
-    `<div style="display:flex;justify-content:space-between;padding:10px;background:var(--slate50);border-radius:8px;border:1px solid var(--card-border);font-size:12px;font-weight:700">
-      <span>${a.name} <span style="color:var(--text-muted);font-weight:500">(${a.ca})</span></span>
-      <button onclick="delAccount('${a.ca}')" style="background:none;border:none;color:var(--rose);cursor:pointer"><i class="fa-solid fa-trash"></i></button>
+function renderAccList() {
+  document.getElementById('acc-list').innerHTML = settings.accounts.length ? settings.accounts.map(a =>
+    `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--s50);border-radius:10px;border:1px solid var(--border)">
+      <div>
+        <span style="font-size:13px;font-weight:800">${a.alias}</span>
+        <span class="mono" style="font-size:11px;color:var(--muted);margin-left:8px">${a.ca}</span>
+        <span class="hist-badge" style="margin-left:8px">${bills.filter(b=>b.account_number===a.ca).length} bills</span>
+      </div>
+      <button onclick="delAccount('${a.ca}')" style="background:none;border:none;color:var(--rose);cursor:pointer"><i class="fa-solid fa-trash text-xs"></i></button>
     </div>`
-  ).join('');
-}
-function saveSettings() {
-  settings.groqKey = document.getElementById('set-groq').value.trim();
-  ['slab1','rate1','rate2','fixed'].forEach(k => settings[k] = parseFloat(document.getElementById('set-'+k).value)||0);
-  saveLocal(); toast('Settings saved');
+  ).join('') : '<p style="font-size:12px;color:var(--muted);font-weight:600">No accounts added yet. Bills will auto-add accounts when saved.</p>';
 }
 
-/* ════════════════════════════════════════════════════
-   UPLOAD & PARSING LOGIC
-════════════════════════════════════════════════════ */
-function setUploadMode(mode) {
-  uploadMode = mode;
-  document.querySelectorAll('#btn-mode-ai, #btn-mode-local, #btn-mode-manual').forEach(b => {
-    b.style.background = 'var(--card-bg)'; b.style.color = 'var(--text)'; b.style.borderColor = 'var(--card-border)';
-  });
-  const activeBtn = document.getElementById('btn-mode-'+mode);
-  activeBtn.style.background = 'var(--sky)'; activeBtn.style.color = '#fff'; activeBtn.style.borderColor = 'var(--sky)';
-
-  document.getElementById('file-drop-area').style.display = (mode==='ai'||mode==='local') ? 'block' : 'none';
-  document.getElementById('manual-prompt-area').style.display = (mode==='manual') ? 'block' : 'none';
-  document.getElementById('upload-hint').textContent = mode==='ai' ? 'PDF or Image (Requires Groq Key)' : 'PDF Only (Local Text Regex)';
+function getActiveBills() {
+  let b = currentAcc === 'ALL' ? [...bills] : bills.filter(b => b.account_number === currentAcc);
+  return b.sort((a,b) => sortM(a.bill_month) - sortM(b.bill_month));
+}
+function sortM(m) {
+  if(!m) return 0;
+  const mo = {JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
+  const [mn,yr] = (m||'').split('-');
+  return (parseInt(yr||2026)*100) + (mo[mn?.toUpperCase()]||0);
 }
 
-// Drag & Drop bindings
-const dropZone = document.getElementById('drop-zone');
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
-function handleFileSelect(e) { handleFile(e.target.files[0]); }
-
-async function handleFile(file) {
-  if(!file) return;
-  document.getElementById('drop-zone').style.display = 'none';
-  const proc = document.getElementById('processing-state');
-  proc.style.display = 'block';
-
+// ═══════════════════════════════════════════════════
+//  PROMPT COPY
+// ═══════════════════════════════════════════════════
+async function copyPrompt() {
   try {
-    let resultJSON = null;
-    if(uploadMode === 'local') {
-      if(file.type !== 'application/pdf') throw new Error('Local mode requires PDF.');
-      document.getElementById('proc-title').textContent = 'Extracting PDF Text Locally...';
-      const text = await extractPDFText(file);
-      resultJSON = parseRegex(text);
-    } 
-    else if(uploadMode === 'ai') {
-      if(!settings.groqKey) throw new Error('Please set Groq API Key in Settings first.');
-      if(file.type === 'application/pdf') {
-        document.getElementById('proc-title').textContent = 'Extracting Text for Groq...';
-        const text = await extractPDFText(file);
-        document.getElementById('proc-title').textContent = 'Asking Groq (Llama 3.3)...';
-        resultJSON = await callGroqText(text);
-      } else {
-        document.getElementById('proc-title').textContent = 'Asking Groq Vision...';
-        const b64 = await fileToBase64(file);
-        resultJSON = await callGroqVision(b64);
-      }
-    }
-    
-    if(!resultJSON.bill_month || !resultJSON.account_number) throw new Error('Could not reliably extract Month and CA Number.');
-    extractedTemp = resultJSON;
-    showPreview(resultJSON);
+    await navigator.clipboard.writeText(PROMPT);
+    const b = document.getElementById('copy-btn');
+    b.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+    b.style.background = 'linear-gradient(135deg,var(--em),#059669)';
+    setTimeout(() => { b.innerHTML = '<i class="fa-regular fa-copy"></i> Copy Prompt'; b.style.background = ''; }, 2500);
+    toast('Prompt copied! Now go to your AI assistant');
   } catch(e) {
-    toast(e.message, true);
-    resetUpload();
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = PROMPT; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('Prompt copied!');
   }
 }
 
-// 1. Local PDF Extraction (pdf.js)
-async function extractPDFText(file) {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-  let fullText = '';
-  for(let i=1; i<=pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    fullText += textContent.items.map(s => s.str).join(' ') + '\n';
-  }
-  return fullText;
-}
-
-// 2. Regex Fallback Parser
-function parseRegex(text) {
-  const d = { 
-    account_number: (text.match(/CA Number\s*[:\-]?\s*(\d+)/i) || [])[1],
-    bill_month: (text.match(/(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*-\s*20\d{2}/i) || [])[0],
-    total_units_consumed: parseFloat((text.match(/Total Units\s*[:\-]?\s*(\d+(\.\d+)?)/i) || [])[1]) || 0,
-    current_bill_amount: parseFloat((text.match(/Current Bill Amount\s*[:\-]?\s*(\d+(\.\d+)?)/i) || [])[1]) || 0,
-    power_factor: parseFloat((text.match(/Power Factor\s*[:\-]?\s*(0\.\d+)/i) || [])[1]) || 1,
-    current_reading: parseFloat((text.match(/Current Reading\s*[:\-]?\s*(\d+(\.\d+)?)/i) || [])[1]) || 0,
-    solar_current_month_balance: parseFloat((text.match(/Solar.*Balance\s*[:\-]?\s*(\d+)/i) || [])[1]) || 0
-  };
-  if(d.bill_month) d.bill_month = d.bill_month.toUpperCase();
-  return d;
-}
-
-// 3. Groq Prompts & Calls
-const GROQ_SYS_PROMPT = `Extract SBPDCL electricity bill data into strict JSON format. 
-Required keys: bill_month (e.g. MAY-2026), account_number, total_units_consumed (number), fixed_charge_demand_charge (number), energy_charge (number), state_subsidy_free_units (number), current_bill_amount (number), power_factor (number), current_reading (number), previous_reading (number), solar_current_month_balance (number). Return ONLY valid JSON object.`;
-
-async function callGroqText(text) {
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${settings.groqKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
-      messages: [{role: 'system', content: GROQ_SYS_PROMPT}, {role: 'user', content: `Bill Text:\n${text.substring(0, 4000)}`}],
-      response_format: { type: 'json_object' }
-    })
-  });
-  if(!res.ok) throw new Error('Groq API Error: ' + res.status);
-  const data = await res.json();
-  return JSON.parse(data.choices[0].message.content);
-}
-
-async function callGroqVision(b64) {
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${settings.groqKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'llama-3.2-11b-vision-preview',
-      messages: [{ role: 'user', content: [{type:'text', text: GROQ_SYS_PROMPT}, {type:'image_url', image_url:{url: b64}}] }]
-    })
-  });
-  if(!res.ok) throw new Error('Groq Vision Error: ' + res.status);
-  const data = await res.json();
-  // Vision models sometimes ignore json_object formatting, so extract via regex
-  const text = data.choices[0].message.content;
-  const match = text.match(/\{[\s\S]*\}/);
-  return JSON.parse(match ? match[0] : '{}');
-}
-
-function fileToBase64(file) {
-  return new Promise((res, rej) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => res(reader.result);
-    reader.onerror = error => rej(error);
-  });
-}
-
-// 4. Manual JSON Paste
-function processManualJSON() {
+// ═══════════════════════════════════════════════════
+//  PARSE AI RESPONSE
+// ═══════════════════════════════════════════════════
+function parseAndPreview() {
+  const raw = document.getElementById('paste-area').value.trim();
+  const errEl = document.getElementById('parse-error');
+  errEl.style.display = 'none';
+  if(!raw) { showParseErr('Paste the AI response first.'); return; }
   try {
-    const txt = document.getElementById('manual-json-input').value;
-    const match = txt.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(match ? match[0] : '{}');
-    if(!parsed.bill_month) throw new Error('Invalid JSON missing bill_month');
-    extractedTemp = parsed;
-    showPreview(parsed);
-  } catch(e) { toast('Invalid JSON', true); }
+    const match = raw.match(/\{[\s\S]*\}/);
+    if(!match) throw new Error('No JSON object found in the response');
+    const d = JSON.parse(match[0]);
+    if(!d.bill_month && !d.account_number) throw new Error('Parsed JSON seems empty — check the AI response');
+    parsedTemp = { ...d, id: Date.now(), saved_at: new Date().toISOString(), source: 'ai' };
+    showPreview(parsedTemp);
+  } catch(e) { showParseErr('Parse failed: ' + e.message + '. Make sure the AI returned pure JSON.'); }
 }
-
+function showParseErr(msg) {
+  const el = document.getElementById('parse-error');
+  el.style.display = 'block'; el.textContent = '❌ ' + msg;
+}
 function showPreview(d) {
-  document.getElementById('upload-zone-wrapper').style.display = 'none';
-  document.getElementById('processing-state').style.display = 'none';
-  document.getElementById('bill-preview').style.display = 'block';
-  const grid = document.getElementById('preview-grid');
-  grid.innerHTML = Object.entries(d).filter(([k,v])=>v!==null&&v!==undefined).map(([k,v]) => 
-    `<div><div style="font-size:9px;font-weight:800;color:var(--text-muted);text-transform:uppercase">${k.replace(/_/g,' ')}</div><div class="mono" style="font-size:12px;font-weight:700">${v}</div></div>`
-  ).join('');
-}
-function resetUpload() {
-  extractedTemp = null;
-  document.getElementById('upload-zone-wrapper').style.display = 'block';
-  document.getElementById('bill-preview').style.display = 'none';
-  document.getElementById('drop-zone').style.display = 'block';
-  document.getElementById('processing-state').style.display = 'none';
-  document.getElementById('manual-json-input').value = '';
-}
-function saveExtractedBill() {
-  if(!extractedTemp) return;
-  // auto-assign CA if not present
-  if(!extractedTemp.account_number && currentAcc !== 'ALL') extractedTemp.account_number = currentAcc;
-  const idx = bills.findIndex(b => b.bill_month === extractedTemp.bill_month && b.account_number === extractedTemp.account_number);
-  if(idx > -1) bills[idx] = extractedTemp; else bills.push(extractedTemp);
-  
-  // Create account if new
-  if(extractedTemp.account_number && !settings.accounts.find(a=>a.ca===extractedTemp.account_number)) {
-    settings.accounts.push({ca: extractedTemp.account_number, name: `New (${extractedTemp.account_number.slice(-4)})`});
-    updateAccSwitcher();
+  // Key fields
+  const kf = document.getElementById('preview-key');
+  const keys = [
+    ['Bill Month', d.bill_month || '—', '#0ea5e9'],
+    ['Account', d.account_number || '—', '#6366f1'],
+    ['Total Units', (d.total_units_consumed||0) + ' kWh', '#eab308'],
+    ['Net Amount', famt(d.amount_due_by_date ?? d.current_bill_amount), d.amount_due_by_date <= 0 ? '#10b981' : '#f43f5e'],
+    ['Due Date', d.due_date || '—', '#f43f5e'],
+    ['Power Factor', d.power_factor || '—', d.power_factor >= 0.95 ? '#10b981' : '#f43f5e'],
+    ['Solar Balance', (d.solar_current_balance||0) + ' units', '#eab308'],
+    ['Prev Paid', famt(d.prev_payment_amount), '#10b981'],
+  ];
+  kf.innerHTML = keys.map(([l,v,c]) =>
+    `<div style="padding:10px;background:var(--s50);border-radius:10px;border:1px solid var(--border)">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:var(--muted);margin-bottom:3px">${l}</div>
+      <div class="mono" style="font-weight:700;font-size:13px;color:${c}">${v}</div>
+    </div>`).join('');
+
+  // Subtitle
+  const nm = d.consumer_name || '';
+  const isZero = (d.amount_due_by_date||d.current_bill_amount||0) <= 0;
+  document.getElementById('preview-subtitle').innerHTML = `${nm ? nm + ' · ' : ''}${isZero ? '<span style="color:var(--em);font-weight:800">🎉 Zero Bill!</span>' : ''} ${d.bill_days||0} days`;
+
+  // History import banner
+  const hc = d.history_consumption;
+  if(hc && Object.keys(hc).length > 0) {
+    document.getElementById('history-import-banner').style.display = 'block';
+    document.getElementById('hist-import-msg').textContent =
+      `Found ${Object.keys(hc).length} months of consumption data in this bill. Import as historical records?`;
   }
-  
-  saveLocal(); toast('Bill Saved!'); resetUpload();
-  switchTab('dashboard');
+
+  // All fields
+  const allEl = document.getElementById('preview-all');
+  const skip = ['id','saved_at','source','history_consumption'];
+  allEl.innerHTML = Object.entries(d).filter(([k,v]) => !skip.includes(k) && v !== 0 && v !== '' && v !== null && v !== false).map(([k,v]) =>
+    `<div style="padding:8px 10px;background:var(--s50);border-radius:8px;border:1px solid var(--border)">
+      <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin-bottom:2px">${k.replace(/_/g,' ')}</div>
+      <div class="mono" style="font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v}</div>
+    </div>`).join('');
+
+  document.getElementById('preview-card').style.display = 'block';
+  document.getElementById('preview-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-/* ════════════════════════════════════════════════════
-   DASHBOARD & ANALYTICS RENDERING
-════════════════════════════════════════════════════ */
-function renderAll() {
-  const active = getActiveBills();
-  renderDashboard(active);
-  renderHistory(active);
-  renderCharts(active);
+function cancelPreview() {
+  parsedTemp = null;
+  document.getElementById('preview-card').style.display = 'none';
+  document.getElementById('paste-area').value = '';
+  document.getElementById('parse-error').style.display = 'none';
+  document.getElementById('history-import-banner').style.display = 'none';
 }
 
-function renderDashboard(active) {
-  const latest = active[active.length-1];
-  const prev = active[active.length-2];
-  
-  // 1. Basic Stats
-  if(latest) {
-    document.getElementById('st-units').textContent = latest.total_units_consumed||0;
-    document.getElementById('st-amt').textContent = `₹${latest.current_bill_amount||0}`;
-    document.getElementById('st-solar').textContent = latest.solar_current_month_balance||0;
-    
-    if(prev) {
-      const udiff = (latest.total_units_consumed||0) - (prev.total_units_consumed||0);
-      document.getElementById('st-units-sub').textContent = `${udiff>0?'↑':'↓'} ${Math.abs(udiff)} vs last month`;
+// ═══════════════════════════════════════════════════
+//  HISTORY IMPORT
+// ═══════════════════════════════════════════════════
+function importHistoryData() {
+  if(!parsedTemp?.history_consumption) return;
+  const hc = parsedTemp.history_consumption;
+  const ca = parsedTemp.account_number || '';
+  let imported = 0;
+  Object.entries(hc).forEach(([mo, units]) => {
+    const mKey = mo.toUpperCase().replace(' ','');
+    if(!bills.find(b => b.bill_month === mKey && b.account_number === ca)) {
+      bills.push({
+        id: Date.now() + Math.random(),
+        saved_at: new Date().toISOString(),
+        source: 'history_import',
+        bill_month: mKey,
+        account_number: ca,
+        consumer_name: parsedTemp.consumer_name || '',
+        total_units_consumed: parseInt(units) || 0,
+        current_bill_amount: 0, amount_due_by_date: 0,
+        solar_current_balance: 0, power_factor: 0,
+        notes: 'Imported from bill history'
+      });
+      imported++;
     }
+  });
+  if(imported > 0) {
+    bills.sort((a,b) => sortM(a.bill_month) - sortM(b.bill_month));
+    saveLocal(); renderAll();
+    toast(`✅ ${imported} historical months imported!`);
+    document.getElementById('history-import-banner').style.display = 'none';
   } else {
-    ['st-units','st-amt','st-solar'].forEach(id => document.getElementById(id).textContent = '0');
+    toast('No new months to import (already exist)');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  SAVE BILL
+// ═══════════════════════════════════════════════════
+function saveBill() {
+  if(!parsedTemp) return;
+  storeBill(parsedTemp);
+  cancelPreview();
+  sw('dashboard');
+}
+function storeBill(d) {
+  const idx = bills.findIndex(b => b.bill_month === d.bill_month && b.account_number === d.account_number);
+  if(idx > -1) { if(!confirm(`Replace existing ${d.bill_month} bill?`)) return; bills[idx] = d; }
+  else bills.push(d);
+  bills.sort((a,b) => sortM(a.bill_month) - sortM(b.bill_month));
+  autoDiscoverAccounts(); updateAccSwitcher();
+  saveLocal(); renderAll();
+  toast('✅ Bill saved!');
+}
+
+// ═══════════════════════════════════════════════════
+//  MANUAL ENTRY
+// ═══════════════════════════════════════════════════
+function saveManual() {
+  const g = id => document.getElementById(id).value;
+  const gn = id => parseFloat(g(id)) || 0;
+  const d = {
+    id: Date.now(), saved_at: new Date().toISOString(), source: 'manual',
+    bill_month: g('m-mo').trim().toUpperCase(),
+    account_number: g('m-ca').trim(),
+    consumer_name: g('m-name').trim(),
+    consumer_category: g('m-cat').trim(),
+    total_units_consumed: gn('m-units'),
+    bill_days: gn('m-days'),
+    current_reading_ph1: gn('m-cr1'),
+    previous_reading_ph1: gn('m-pr1'),
+    current_reading_date: g('m-rdate'),
+    fixed_charge: gn('m-fixed'),
+    energy_charge: gn('m-energy'),
+    subsidy_free_units: gn('m-subsidy'),
+    current_bill_amount: gn('m-net'),
+    amount_due_by_date: gn('m-due'),
+    due_date: g('m-duedate'),
+    power_factor: gn('m-pf'),
+    solar_current_balance: gn('m-solar'),
+    prev_payment_amount: gn('m-pp'),
+  };
+  if(!d.bill_month) { toast('Enter bill month','err'); return; }
+  storeBill(d); closeModal('manual-modal');
+}
+
+// ═══════════════════════════════════════════════════
+//  DASHBOARD RENDER
+// ═══════════════════════════════════════════════════
+function renderAll() { const a = getActiveBills(); renderDash(a); renderHistory(a); }
+function renderDash(active) {
+  const latest = active[active.length - 1];
+  const prev   = active[active.length - 2];
+
+  // Stats
+  if(latest) {
+    const u = latest.total_units_consumed || 0;
+    const pu = prev?.total_units_consumed || 0;
+    const ud = pu ? ((u-pu)/pu*100).toFixed(0) : null;
+    document.getElementById('s-units').textContent = u;
+    document.getElementById('s-units-sub').textContent = ud ? (ud>0?'↑':'↓')+Math.abs(ud)+'% vs prev' : 'kWh consumed';
+
+    const amt = latest.amount_due_by_date ?? latest.current_bill_amount ?? 0;
+    document.getElementById('s-amt').textContent = famt(amt);
+    document.getElementById('s-amt-sub').textContent = amt <= 0 ? '🎉 Zero / Credit' : `Due: ${latest.due_date||'—'}`;
+
+    const sol = latest.solar_current_balance || 0;
+    document.getElementById('s-solar').textContent = sol;
+    const rate = settings.rate || 7.3;
+    document.getElementById('s-solar-sub').textContent = sol > 0 ? `≈₹${Math.round(sol*rate)} saved` : 'no solar data';
   }
 
-  // 2. Next Month Forecast
+  // Forecast
   if(active.length >= 3) {
     const last3 = active.slice(-3);
-    const avgU = last3.reduce((s,b)=>s+(b.total_units_consumed||0),0) / 3;
-    const avgA = last3.reduce((s,b)=>s+(b.current_bill_amount||0),0) / 3;
-    
-    // Simple seasonality logic: Check same month last year if available
-    const lastMo = latest.bill_month; // e.g. MAY-2026
-    const [m,y] = lastMo.split('-');
-    const nextMoStr = getNextMonthStr(m) + '-' + (m==='DEC'?parseInt(y)+1:y);
-    const prevYearMo = nextMoStr.split('-')[0] + '-' + (parseInt(nextMoStr.split('-')[1])-1);
-    const histBill = active.find(b => b.bill_month === prevYearMo);
-    
-    const fcstAmt = histBill ? (histBill.current_bill_amount * 1.05) : avgA; // 5% inflation guess
-    document.getElementById('st-forecast').textContent = `₹${Math.round(fcstAmt)}`;
-    document.getElementById('st-forecast-sub').textContent = `For ${nextMoStr}`;
-  } else {
-    document.getElementById('st-forecast').textContent = '—';
-    document.getElementById('st-forecast-sub').textContent = 'Need 3+ bills';
+    const avgAmt = last3.reduce((s,b)=>s+Math.abs(b.current_bill_amount||b.amount_due_by_date||0),0)/3;
+    document.getElementById('s-fore').textContent = '₹'+Math.round(avgAmt);
+    document.getElementById('s-fore-sub').textContent = 'based on 3-mo avg';
   }
+  document.getElementById('s-units').textContent = latest?.total_units_consumed || '—';
 
-  // 3. Tariff Slab Analyzer
-  const insightsDiv = document.getElementById('dash-insights');
-  if(!latest) { insightsDiv.innerHTML = '<p style="font-size:12px;color:var(--text-muted)">Upload bills to see insights.</p>'; return; }
-  
-  let insights = [];
-  const u = latest.total_units_consumed||0;
-  const {slab1, rate1, rate2} = settings;
-  
+  // Due Alert
+  renderDueAlert(latest);
+
+  // Insights
+  renderInsights(active, latest, prev);
+
+  // Bill breakdown
+  renderBillBreakdown(latest);
+
+  // Consumer card
+  renderConsumerCard(latest);
+
+  // Quick chart
+  const labels = active.slice(-6).map(b => b.bill_month?.slice(0,3)||'?');
+  const data   = active.slice(-6).map(b => b.total_units_consumed||0);
+  drawChart('c-quick','bar',labels,[{
+    data, label:'kWh',
+    backgroundColor: data.map((_,i)=>i===data.length-1?'#0ea5e9':'rgba(14,165,233,.4)'),
+    borderRadius:7,borderSkipped:false
+  }],{y:{beginAtZero:true}});
+}
+
+function renderDueAlert(b) {
+  const el = document.getElementById('due-alert');
+  if(!b?.due_date) { el.style.display='none'; return; }
+  const dd = b.due_date.split('.');
+  const due = new Date(`${dd[2]}-${dd[1]}-${dd[0]}`);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diff = Math.ceil((due - today) / 86400000);
+  if(diff < 0 || diff > 15) { el.style.display='none'; return; }
+  const urgent = diff <= 3;
+  el.style.display = 'flex';
+  el.style.background = urgent ? 'rgba(244,63,94,.07)' : 'rgba(234,179,8,.07)';
+  el.style.borderColor = urgent ? 'rgba(244,63,94,.3)' : 'rgba(234,179,8,.3)';
+  el.style.color = urgent ? 'var(--rose)' : 'var(--volt-d)';
+  el.innerHTML = `<i class="fa-solid fa-bell fa-bounce"></i>
+    <div style="flex:1">
+      <b>Bill due ${diff===0?'TODAY':diff===1?'TOMORROW':'in '+diff+' days'}!</b>
+      <span style="font-size:11px;opacity:.8;margin-left:8px">${b.bill_month} · Amount: ${famt(b.amount_due_by_date??b.current_bill_amount??0)}</span>
+    </div>
+    <span style="font-size:11px;font-weight:800">${b.due_date}</span>`;
+}
+
+function renderInsights(active, latest, prev) {
+  if(!latest) { document.getElementById('insights').innerHTML = `<div class="icard"><div class="iicon" style="background:rgba(14,165,233,.1)">📊</div><div><h4 style="font-weight:800;font-size:13px">No bills yet</h4><p style="font-size:11px;color:var(--muted)">Add your first SBPDCL bill to see insights.</p></div></div>`; return; }
+  const items = [];
+  const u = latest.total_units_consumed || 0;
+  const pu = prev?.total_units_consumed;
+  const {slab1,rate1,rate2} = settings;
+
+  // Slab analysis
   if(u > slab1) {
     const extra = u - slab1;
-    const diff = (rate2 - rate1).toFixed(2);
-    insights.push({i:'⚠️', c:'var(--rose-d)', t:`Slab Exceeded! (> ${slab1} units)`, d:`You used ${extra} units in the expensive tier. Lowering usage below ${slab1} saves ₹${diff}/unit.`});
+    items.push({i:'⚠️',c:'rgba(244,63,94,.1)',tc:'var(--rose)',t:`Slab 2 active — ${extra} units above ₹${rate1}/unit`,d:`You exceeded the ${slab1}-unit slab. ${extra} units are billed at ₹${rate2}/unit. Reducing by ${extra} units saves ≈₹${Math.round(extra*(rate2-rate1))}.`});
   } else {
-    const margin = slab1 - u;
-    insights.push({i:'✅', c:'var(--emerald)', t:`Optimal Slab Range`, d:`You are ${margin} units away from the expensive tier. Keep it up!`});
+    items.push({i:'✅',c:'rgba(16,185,129,.1)',tc:'var(--em)',t:`Within slab 1 — Good!`,d:`${slab1-u} units remain in the cheaper ₹${rate1}/unit slab.`});
+  }
+  // PF
+  if(latest.power_factor && latest.power_factor < 0.95) {
+    items.push({i:'⚡',c:'rgba(234,179,8,.1)',tc:'var(--volt-d)',t:`Low Power Factor: ${latest.power_factor}`,d:`PF < 0.95 may attract penalty charges. Check capacitor banks and reduce inductive loads.`});
+  }
+  // Spike
+  if(pu && u > pu * 1.3) {
+    items.push({i:'📈',c:'rgba(244,63,94,.1)',tc:'var(--rose)',t:`Consumption spike: ↑${Math.round((u-pu)/pu*100)}% vs last month`,d:`${u} vs ${pu} units. Check for new appliances, AC usage, or meter issues.`});
+  }
+  if(pu && u < pu * 0.7) {
+    items.push({i:'📉',c:'rgba(16,185,129,.1)',tc:'var(--em)',t:`Big drop: ↓${Math.round((pu-u)/pu*100)}% vs last month`,d:`${u} vs ${pu} units. Great efficiency — or check for meter issues if too low.`});
+  }
+  // Solar
+  const sol = latest.solar_current_balance || 0;
+  if(sol > 0) { items.push({i:'☀️',c:'rgba(234,179,8,.1)',tc:'var(--volt-d)',t:`Solar banked: ${sol} units`,d:`Estimated ₹${Math.round(sol*settings.rate)} in savings. Keep generating!`}); }
+  // Zero bill
+  if((latest.amount_due_by_date||latest.current_bill_amount||0) <= 0) {
+    items.push({i:'🎉',c:'rgba(16,185,129,.1)',tc:'var(--em)',t:`Zero Bill Month!`,d:`Your solar surplus or government subsidy covered the entire bill this month.`});
+  }
+  // Prev payment
+  if(latest.prev_payment_amount) {
+    items.push({i:'💳',c:'rgba(14,165,233,.1)',tc:'var(--sky)',t:`Last payment: ₹${latest.prev_payment_amount}`,d:`Paid on ${latest.prev_payment_date||'—'}. Receipt: ${latest.prev_payment_receipt||'—'}`});
   }
 
-  if((latest.power_factor||1) < 0.95) insights.push({i:'⚙️', c:'var(--volt-d)', t:`Poor Power Factor`, d:`PF is ${latest.power_factor}. Getting below 0.90 will attract heavy penalties.`});
-  
-  if(latest.solar_current_month_balance > 0) {
-    const sv = latest.solar_current_month_balance * rate1;
-    insights.push({i:'☀️', c:'var(--sky-d)', t:`Solar Contributor`, d:`Your solar banked units saved you approx ₹${Math.round(sv)} this month.`});
-  }
-
-  insightsDiv.innerHTML = insights.map(x => 
-    `<div class="insight-card"><div class="insight-icon" style="background:${x.c}15;color:${x.c}">${x.i}</div><div><h4 style="font-size:12px;font-weight:800;margin-bottom:2px">${x.t}</h4><p style="font-size:11px;color:var(--text-muted);font-weight:600;line-height:1.4">${x.d}</p></div></div>`
-  ).join('');
-
-  // Quick Trend
-  const labels = active.slice(-6).map(b => b.bill_month.substring(0,3));
-  const data = active.slice(-6).map(b => b.total_units_consumed||0);
-  drawChart('chart-quick', 'line', labels, [{data, borderColor:'#0ea5e9', backgroundColor:'rgba(14,165,233,.1)', fill:true, tension:0.4}], true);
+  document.getElementById('insights').innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">${items.map(x=>
+    `<div class="icard"><div class="iicon" style="background:${x.c};color:${x.tc}">${x.i}</div><div><h4 style="font-weight:800;font-size:12px;margin-bottom:2px;color:${x.tc}">${x.t}</h4><p style="font-size:11px;color:var(--muted);font-weight:600;line-height:1.45">${x.d}</p></div></div>`
+  ).join('')}</div>`;
 }
 
-function getNextMonthStr(m) {
-  const arr = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-  const idx = arr.indexOf(m);
-  return idx === 11 ? 'JAN' : arr[idx+1];
+function renderBillBreakdown(b) {
+  const el = document.getElementById('bill-breakdown');
+  if(!b) return;
+  const rows = [
+    ['Energy Charge', b.energy_charge||0, '#0ea5e9'],
+    ['Fixed/Demand', b.fixed_charge||0, '#6366f1'],
+    ['Elec. Duty', b.electricity_duty||0, '#8b5cf6'],
+    ['Other Charges', b.other_charges||0, '#94a3b8'],
+    ['Subtotal', b.subtotal||0, '#f59e0b'],
+    ['Subsidy (Free)', b.subsidy_free_units||0, '#10b981'],
+    ['Subsidy (Sub.)', b.subsidy_subsidised||0, '#34d399'],
+    ['Net Bill', b.current_bill_amount||0, b.current_bill_amount<=0?'#10b981':'#f43f5e'],
+    ['Prev Balance', b.total_previous_balance||0, '#64748b'],
+    ['Total Due', b.amount_due_by_date||b.total_demand||0, (b.amount_due_by_date||0)<=0?'#10b981':'#f43f5e'],
+  ].filter(([,v]) => v !== 0);
+
+  el.innerHTML = rows.map(([l,v,c]) =>
+    `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+      <span style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700">
+        <span style="width:8px;height:8px;border-radius:50%;background:${c};flex-shrink:0"></span>${l}
+      </span>
+      <span class="mono" style="font-size:12px;font-weight:700;color:${c}">${famt(v)}</span>
+    </div>`
+  ).join('') || '<p style="font-size:12px;color:var(--muted);text-align:center;padding:8px">No charge data</p>';
 }
 
-/* ════════════════════════════════════════════════════
-   CHARTS & ANALYTICS
-════════════════════════════════════════════════════ */
-function renderCharts(active) {
-  if(active.length === 0) return;
-
-  // 1. YoY Consumption
-  // Group by month name
-  const yrCur = new Date().getFullYear();
-  const yoyLabels = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-  let curData = new Array(12).fill(0), prevData = new Array(12).fill(0);
-  
-  active.forEach(b => {
-    if(!b.bill_month) return;
-    const [m, y] = b.bill_month.split('-');
-    const idx = yoyLabels.indexOf(m);
-    if(idx === -1) return;
-    if(parseInt(y) === yrCur) curData[idx] = b.total_units_consumed;
-    if(parseInt(y) === yrCur-1) prevData[idx] = b.total_units_consumed;
-  });
-
-  drawChart('chart-yoy', 'bar', yoyLabels, [
-    { label: `Year ${yrCur-1}`, data: prevData, backgroundColor: 'rgba(148,163,184,.4)', borderRadius:4 },
-    { label: `Year ${yrCur}`, data: curData, backgroundColor: '#0ea5e9', borderRadius:4 }
-  ]);
-
-  // 2. Cost Stack (Last 12)
-  const last12 = active.slice(-12);
-  const l12Labels = last12.map(b => b.bill_month.substring(0,3));
-  drawChart('chart-cost-stack', 'bar', l12Labels, [
-    { label: 'Energy (₹)', data: last12.map(b=>b.energy_charge||0), backgroundColor: '#3b82f6' },
-    { label: 'Fixed (₹)', data: last12.map(b=>b.fixed_charge_demand_charge||0), backgroundColor: '#8b5cf6' },
-    { label: 'Subsidy (-₹)', data: last12.map(b=>-Math.abs(b.state_subsidy_free_units||0)), backgroundColor: '#10b981' }
-  ], false, { x:{stacked:true}, y:{stacked:true} });
-
-  // 3. Absolute Meter Readings Line Chart
-  const readLabels = last12.map(b => b.bill_month);
-  const readCons = last12.map(b => b.current_reading||null);
-  const readSol = last12.map(b => b.solar_current_month_balance||null); // Treat balance as cumulative reading proxy for demo
-  
-  drawChart('chart-readings', 'line', readLabels, [
-    { label: 'Grid Meter Reading', data: readCons, borderColor: '#f43f5e', tension:0, pointRadius:4 },
-    { label: 'Solar Banked Units', data: readSol, borderColor: '#eab308', tension:0, pointRadius:4 }
-  ]);
+function renderConsumerCard(b) {
+  const el = document.getElementById('consumer-card');
+  if(!b) return;
+  const acc = settings.accounts.find(a => a.ca === b.account_number);
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
+    ${[
+      ['Consumer',b.consumer_name||'—'],['CA Number',b.account_number||'—'],
+      ['Category',b.consumer_category||'—'],['Meter Phase',b.meter_phase||'—'],
+      ['Meter No.',b.meter_number||'—'],['Area',b.area_type||'—'],
+      ['Division',b.division||'—'],['Sub Division',b.sub_division||'—'],
+      ['Sanc. Load',b.sanctioned_load_kw?b.sanctioned_load_kw+' KW':'—'],
+      ['Rec. Demand',b.recorded_demand_kw?b.recorded_demand_kw+' KW':'—'],
+      ['Connection',b.connection_date||'—'],['Bill Basis',b.bill_basis||'—'],
+      ['Security Dep.',b.security_deposit_amt?'₹'+b.security_deposit_amt:'—'],
+      ['MRU No.',b.mru_number||'—'],
+    ].map(([l,v]) => `
+      <div>
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:var(--muted);margin-bottom:2px">${l}</div>
+        <div style="font-size:12px;font-weight:800">${v}</div>
+      </div>`).join('')}
+  </div>`;
 }
 
-function drawChart(id, type, labels, datasets, hideGrid=false, scaleOpts={}) {
-  const ctx = document.getElementById(id);
-  if(!ctx) return;
-  if(charts[id]) charts[id].destroy();
-  const tc = settings.dark ? '#94a3b8' : '#64748b';
-  const gc = settings.dark ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.05)';
-  
-  charts[id] = new Chart(ctx, {
-    type, data: { labels, datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: tc, font:{family:'Plus Jakarta Sans', size:10, weight:'700'} } } },
-      scales: {
-        x: { grid:{display:!hideGrid, color:gc}, ticks:{color:tc, font:{size:10, weight:'600'}}, ...scaleOpts.x },
-        y: { grid:{display:!hideGrid, color:gc}, ticks:{color:tc, font:{size:10, weight:'600'}}, ...scaleOpts.y }
-      }
-    }
-  });
-}
-
-/* ════════════════════════════════════════════════════
-   HISTORY
-════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════
+//  HISTORY TABLE
+// ═══════════════════════════════════════════════════
 function renderHistory(active) {
-  const tbody = document.getElementById('history-body');
-  if(active.length===0) { tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px">No bills found for this account.</td></tr>`; return; }
-  
-  tbody.innerHTML = [...active].reverse().map(b => `
-    <tr>
-      <td><span class="pill" style="background:var(--slate100);color:var(--slate700)">${(b.account_number||'').slice(-4)}</span></td>
-      <td><b>${b.bill_month}</b></td>
+  const tb = document.getElementById('hist-body');
+  if(!active.length) { tb.innerHTML = `<tr><td colspan="14" style="text-align:center;padding:40px;color:var(--muted);font-weight:700">No bills. Use the Add Bill tab.</td></tr>`; return; }
+  tb.innerHTML = [...active].reverse().map(b => {
+    const amt = b.amount_due_by_date ?? b.current_bill_amount ?? 0;
+    const amtc = amt <= 0 ? 'var(--em)' : amt > 2000 ? 'var(--rose)' : 'inherit';
+    const pfOk = !b.power_factor || b.power_factor >= 0.95;
+    const src = b.source === 'history_import' ? '📅' : b.source === 'manual' ? '✍️' : '🤖';
+    return `<tr style="cursor:pointer" onclick="showDetail(${b.id})">
+      <td><b>${b.bill_month}</b> <span title="${b.source}" style="font-size:11px">${src}</span></td>
+      <td><span class="pill psky">${(b.account_number||'').slice(-4)}</span></td>
       <td class="mono">${b.total_units_consumed||0}</td>
-      <td class="mono" style="color:var(--text-muted)">${b.current_reading||'—'}</td>
-      <td class="mono" style="font-weight:800;color:var(--sky-d)">₹${b.current_bill_amount||0}</td>
-      <td class="mono" style="color:var(--volt-d)">${b.solar_current_month_balance||0}</td>
-      <td>${b.power_factor||'—'}</td>
-      <td><button onclick="delBill(${b.id})" style="background:none;border:none;color:var(--rose);cursor:pointer"><i class="fa-solid fa-trash"></i></button></td>
-    </tr>
-  `).join('');
+      <td class="mono" style="color:var(--muted);font-size:11px">${b.current_reading_ph1||'—'}${b.current_reading_date?'<br><span style="font-size:10px">'+b.current_reading_date+'</span>':''}</td>
+      <td class="mono">${b.bill_days||'—'}</td>
+      <td class="mono">₹${b.fixed_charge||0}</td>
+      <td class="mono">₹${b.energy_charge||0}</td>
+      <td class="mono" style="color:var(--em)">₹${Math.abs(b.subsidy_free_units||0)+Math.abs(b.subsidy_subsidised||0)}</td>
+      <td class="mono" style="font-weight:800;color:${amtc}">${famt(amt)}</td>
+      <td class="mono" style="color:var(--volt-d)">${b.solar_current_balance||0}u</td>
+      <td><span class="pill ${pfOk?'pgreen':'pred'}">${b.power_factor||'—'}</span></td>
+      <td style="font-size:11px">${b.due_date||'—'}</td>
+      <td class="mono" style="font-size:11px;color:var(--em)">₹${b.prev_payment_amount||0}</td>
+      <td><button onclick="event.stopPropagation();delBill(${b.id})" style="background:none;border:none;color:var(--rose);cursor:pointer"><i class="fa-solid fa-trash"></i></button></td>
+    </tr>`;
+  }).join('');
 }
+
 function delBill(id) {
   if(!confirm('Delete this bill?')) return;
   bills = bills.filter(b => b.id !== id);
-  saveLocal(); renderAll(); toast('Deleted');
+  saveLocal(); renderAll(); toast('Bill deleted');
 }
 
-// Boot
+function showDetail(id) {
+  const b = bills.find(x => x.id === id); if(!b) return;
+  document.getElementById('detail-title').textContent = `📄 ${b.bill_month} — ${b.consumer_name||b.account_number}`;
+  const skip = ['id','saved_at','source','history_consumption','notes'];
+  const sections = {
+    'Consumer Info': ['consumer_name','account_number','consumer_id','mru_number','address','mobile','consumer_category','meter_phase','area_type','connection_date','division','sub_division','section','feeder_code','route_pole_code','sanctioned_load_kw','recorded_demand_kw','security_deposit_amt'],
+    'Meter & Readings': ['meter_number','meter_owner','bill_basis','bill_days','current_reading_date','previous_reading_date','current_reading_ph1','previous_reading_ph1','units_ph1','current_reading_ph2','previous_reading_ph2','units_ph2','total_units_consumed','multiplying_factor','power_factor','free_units_ghoshit','subsidised_units'],
+    'Previous Balance': ['advance_deposit_balance','energy_balance','late_fee_balance','other_prev_charges','total_previous_balance'],
+    'Current Bill': ['energy_charge','fixed_charge','excess_demand_charge','electricity_duty','capacitor_charge','other_charges','subtotal','subsidy_free_units','subsidy_subsidised','current_bill_amount'],
+    'Dues & Payments': ['late_payment_surcharge','remission','total_demand','security_deposit_int','concession_amount','due_date','amount_due_by_date','amount_due_plus10','prev_payment_amount','prev_payment_date','prev_payment_receipt'],
+    'Solar & Supply': ['solar_current_balance','solar_prev_balance','avg_supply_hours'],
+  };
+  let html = '';
+  for(const [sec, keys] of Object.entries(sections)) {
+    const entries = keys.filter(k => b[k] !== undefined && b[k] !== 0 && b[k] !== '').map(k =>
+      `<div style="padding:7px 10px;background:var(--s50);border-radius:8px;border:1px solid var(--border)">
+        <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin-bottom:2px">${k.replace(/_/g,' ')}</div>
+        <div class="mono" style="font-size:12px;font-weight:700">${b[k]}</div>
+      </div>`);
+    if(entries.length) html += `<div style="margin-bottom:14px"><div class="sec" style="margin-bottom:8px">${sec}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">${entries.join('')}</div></div>`;
+  }
+  if(b.history_consumption && Object.keys(b.history_consumption).length) {
+    html += `<div class="sec" style="margin-bottom:8px">Last 11 Months History</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${Object.entries(b.history_consumption).map(([mo,u])=>
+        `<div style="padding:6px 10px;background:var(--s50);border-radius:8px;border:1px solid var(--border);text-align:center"><div style="font-size:10px;font-weight:800;color:var(--sky)">${mo}</div><div class="mono" style="font-size:12px;font-weight:700">${u}</div></div>`
+      ).join('')}</div>`;
+  }
+  if(b.notes) html += `<div style="margin-top:12px;padding:10px 12px;background:rgba(14,165,233,.07);border-radius:10px;font-size:12px;font-weight:700;color:var(--sky)">📝 ${b.notes}</div>`;
+  document.getElementById('detail-body').innerHTML = html;
+  openModal('detail-modal');
+}
+
+// ═══════════════════════════════════════════════════
+//  ANALYTICS
+// ═══════════════════════════════════════════════════
+function setPeriod(n) {
+  period = n;
+  ['6','12','99'].forEach(p => {
+    const el = document.getElementById('p'+p);
+    if(parseInt(p)===n) { el.className='pill psky'; el.style.border='1px solid rgba(14,165,233,.3)'; }
+    else { el.className='pill'; el.style.background='var(--card)'; el.style.border='1px solid var(--border)'; el.style.color='var(--muted)'; }
+  });
+  renderAnalytics();
+}
+
+function renderAnalytics() {
+  const all = getActiveBills();
+  const data = period === 99 ? all : all.slice(-period);
+  if(!data.length) return;
+  const labels = data.map(b => b.bill_month?.slice(0,3)+' '+(b.bill_month?.slice(-2)||''));
+  const units  = data.map(b => b.total_units_consumed||0);
+  const amts   = data.map(b => Math.abs(b.current_bill_amount||b.amount_due_by_date||0));
+  const pf     = data.map(b => b.power_factor||null);
+  const solar  = data.map(b => b.solar_current_balance||0);
+  const grid   = data.map((b,i) => Math.max(0, units[i] - solar[i]));
+  const avg    = Math.round(units.reduce((s,v)=>s+v,0)/units.length);
+
+  document.getElementById('avg-badge').textContent = `avg: ${avg} kWh`;
+
+  // Units bar
+  drawChart('c-units','bar',labels,[{
+    data:units,label:'kWh',
+    backgroundColor:units.map((_,i)=>i===units.length-1?'#0ea5e9':'rgba(14,165,233,.45)'),
+    borderRadius:6,borderSkipped:false
+  }],{y:{beginAtZero:true}});
+
+  // Amount line
+  drawChart('c-amt','line',labels,[{
+    data:amts,label:'₹ Bill',borderColor:'#f43f5e',backgroundColor:'rgba(244,63,94,.08)',
+    fill:true,tension:.4,pointRadius:4,pointBackgroundColor:'#f43f5e',borderWidth:2
+  }],{y:{beginAtZero:true}});
+
+  // Charge breakdown doughnut (latest)
+  const latest = data[data.length-1];
+  if(latest) {
+    const bd = [
+      Math.abs(latest.energy_charge||0),
+      Math.abs(latest.fixed_charge||0),
+      Math.abs(latest.electricity_duty||0),
+      Math.abs(latest.other_charges||0),
+      Math.abs(latest.subsidy_free_units||0)+Math.abs(latest.subsidy_subsidised||0),
+    ];
+    drawChart('c-break','doughnut',['Energy','Fixed','Elec.Duty','Other','Subsidy'],[{
+      data:bd,backgroundColor:['#0ea5e9','#6366f1','#8b5cf6','#94a3b8','#10b981'],borderWidth:0,hoverOffset:8
+    }],{},{plugins:{legend:{position:'bottom',labels:{color:tc(),font:{size:10,weight:'700'}}}}});
+  }
+
+  // YoY
+  const curYr = new Date().getFullYear();
+  const mos = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const cy = new Array(12).fill(0), py = new Array(12).fill(0);
+  all.forEach(b => {
+    const [mn,yr] = (b.bill_month||'').split('-');
+    const idx = mos.indexOf(mn?.toUpperCase());
+    if(idx===-1) return;
+    if(parseInt(yr)===curYr) cy[idx] = b.total_units_consumed||0;
+    if(parseInt(yr)===curYr-1) py[idx] = b.total_units_consumed||0;
+  });
+  document.getElementById('yoy-label').textContent = `${curYr-1} vs ${curYr}`;
+  drawChart('c-yoy','bar',mos,[
+    {label:''+(curYr-1),data:py,backgroundColor:'rgba(148,163,184,.4)',borderRadius:4},
+    {label:''+curYr,    data:cy,backgroundColor:'#0ea5e9',borderRadius:4}
+  ],{y:{beginAtZero:true}});
+
+  // Solar vs Grid
+  drawChart('c-solar-grid','bar',labels,[
+    {label:'Grid (kWh)',  data:grid, backgroundColor:'rgba(99,102,241,.7)',borderRadius:5,borderSkipped:false},
+    {label:'Solar (kWh)', data:solar,backgroundColor:'rgba(234,179,8,.8)',borderRadius:5,borderSkipped:false}
+  ],{y:{beginAtZero:true,stacked:true},x:{stacked:true}});
+
+  // Power factor
+  drawChart('c-pf','line',labels,[
+    {label:'PF',data:pf,borderColor:'#8b5cf6',backgroundColor:'rgba(139,92,246,.08)',fill:true,tension:.4,pointRadius:5,
+     pointBackgroundColor:pf.map(v=>!v||v>=0.95?'#10b981':'#f43f5e'),borderWidth:2},
+    {label:'Target 0.95',data:labels.map(()=>0.95),borderColor:'rgba(16,185,129,.5)',borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false}
+  ],{y:{min:.7,max:1.0}});
+
+  runCalc();
+}
+
+function runCalc() {
+  const u = parseInt(document.getElementById('calc-units').value)||0;
+  document.getElementById('calc-unit-val').textContent = u;
+  const {slab1,rate1,rate2,fixed} = settings;
+  const energy = u <= slab1 ? u*rate1 : slab1*rate1 + (u-slab1)*rate2;
+  const fc = fixed; // simplified
+  document.getElementById('calc-energy').textContent = '₹'+Math.round(energy);
+  document.getElementById('calc-fixed').textContent  = '₹'+Math.round(fc);
+  document.getElementById('calc-total').textContent  = '₹'+Math.round(energy+fc);
+}
+
+// ═══════════════════════════════════════════════════
+//  SOLAR TAB
+// ═══════════════════════════════════════════════════
+function renderSolar() {
+  const all = getActiveBills();
+  const withSolar = all.filter(b => b.solar_current_balance > 0);
+  if(!withSolar.length) {
+    document.getElementById('solar-insights').innerHTML = `<div class="icard"><div class="iicon" style="background:rgba(234,179,8,.1)">☀️</div><div><h4 style="font-weight:800;font-size:13px">No solar data yet</h4><p style="font-size:11px;color:var(--muted)">Bills with solar net metering data will show here.</p></div></div>`;
+    return;
+  }
+  const latest = all[all.length-1];
+  const rate = settings.rate || 7.3;
+  const allSolar = all.map(b=>b.solar_current_balance||0);
+  const totalSol = allSolar.reduce((s,v)=>s+v,0);
+  const peakIdx  = allSolar.indexOf(Math.max(...allSolar));
+  const peakBill = all[peakIdx];
+
+  document.getElementById('sol-cur').textContent = latest?.solar_current_balance||0;
+  document.getElementById('sol-save').textContent = '₹'+Math.round((latest?.solar_current_balance||0)*rate);
+  document.getElementById('sol-peak').textContent = Math.max(...allSolar);
+  document.getElementById('sol-peak-mo').textContent = peakBill?.bill_month||'—';
+  document.getElementById('sol-hrs').textContent = latest?.avg_supply_hours||'—';
+
+  const labels = all.slice(-12).map(b=>b.bill_month?.slice(0,3)||'?');
+  const solData = all.slice(-12).map(b=>b.solar_current_balance||0);
+  const units12 = all.slice(-12).map(b=>b.total_units_consumed||0);
+
+  drawChart('c-solar','bar',labels,[{
+    data:solData,label:'Solar Balance (units)',
+    backgroundColor:solData.map((_,i)=>i===solData.length-1?'#eab308':'rgba(234,179,8,.5)'),
+    borderRadius:7,borderSkipped:false
+  }],{y:{beginAtZero:true}});
+
+  drawChart('c-solar-pct','bar',labels,[
+    {label:'Grid',data:units12.map((u,i)=>Math.max(0,u-solData[i])),backgroundColor:'rgba(99,102,241,.65)',borderRadius:5,borderSkipped:false},
+    {label:'Solar',data:solData,backgroundColor:'rgba(234,179,8,.8)',borderRadius:5,borderSkipped:false},
+  ],{y:{beginAtZero:true,stacked:true},x:{stacked:true}});
+
+  const avgSol = totalSol / (all.length||1);
+  const zeroBill = all.filter(b=>(b.amount_due_by_date||b.current_bill_amount||0)<=0).length;
+  document.getElementById('solar-insights').innerHTML = [
+    {i:'📊',c:'rgba(14,165,233,.1)',tc:'var(--sky)',t:`Avg solar balance: ${avgSol.toFixed(0)} units/mo`,d:`Estimated ₹${Math.round(avgSol*rate)} saved per month`},
+    {i:'🏆',c:'rgba(234,179,8,.1)',tc:'var(--volt-d)',t:`Best month: ${Math.max(...allSolar)} units (${peakBill?.bill_month||'—'})`,d:`Your highest solar surplus on record`},
+    {i:'🎉',c:'rgba(16,185,129,.1)',tc:'var(--em)',t:`${zeroBill} Zero-bill months`,d:`Solar covered your entire bill ${zeroBill} time(s)`},
+    {i:'💰',c:'rgba(16,185,129,.1)',tc:'var(--em)',t:`Lifetime est. saving: ₹${Math.round(totalSol*rate*.5)}`,d:`Based on ₹${rate}/unit × 50% net utilisation`},
+  ].map(x=>`<div class="icard"><div class="iicon" style="background:${x.c};color:${x.tc}">${x.i}</div><div><h4 style="font-weight:800;font-size:12px;color:${x.tc};margin-bottom:2px">${x.t}</h4><p style="font-size:11px;color:var(--muted);font-weight:600;line-height:1.4">${x.d}</p></div></div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+//  CHARTS
+// ═══════════════════════════════════════════════════
+function tc(){ return settings.dark?'#94a3b8':'#64748b'; }
+function gc(){ return settings.dark?'rgba(255,255,255,.05)':'rgba(0,0,0,.04)'; }
+
+function drawChart(id,type,labels,datasets,scalesOpts={},extraOpts={}) {
+  const canvas = document.getElementById(id); if(!canvas) return;
+  if(charts[id]) charts[id].destroy();
+  const base = {
+    responsive:true,maintainAspectRatio:true,
+    plugins:{ legend:{ labels:{ color:tc(), font:{family:"'Plus Jakarta Sans'",size:10,weight:'700'} }}},
+    scales: type==='doughnut' ? {} : {
+      x:{ grid:{color:gc()}, ticks:{color:tc(),font:{size:10,weight:'600'}}, border:{display:false}, ...scalesOpts.x },
+      y:{ grid:{color:gc()}, ticks:{color:tc(),font:{size:10,weight:'600'}}, border:{display:false}, beginAtZero:true, ...scalesOpts.y },
+    }
+  };
+  charts[id] = new Chart(canvas,{type,data:{labels,datasets},options:merge(base,extraOpts)});
+}
+function merge(a,b){ const o={...a}; for(const k in b){ if(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])) o[k]=merge(a[k]||{},b[k]); else o[k]=b[k]; } return o; }
+
+// ═══════════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════════
+function saveSettings() {
+  settings.slab1 = parseFloat(document.getElementById('s-slab1').value)||100;
+  settings.rate1 = parseFloat(document.getElementById('s-rate1').value)||6.10;
+  settings.rate2 = parseFloat(document.getElementById('s-rate2').value)||6.95;
+  settings.fixed = parseFloat(document.getElementById('s-fixed').value)||40;
+  settings.rate  = parseFloat(document.getElementById('s-rate').value)||7.30;
+  saveLocal(); toast('Settings saved');
+}
+function loadSettingsUI() {
+  ['slab1','rate1','rate2','fixed','rate'].forEach(k=>{
+    const el = document.getElementById('s-'+k); if(el) el.value = settings[k];
+  });
+  const tok = localStorage.getItem('gh_tok'); const gid = localStorage.getItem('gh_gid');
+  if(tok) document.getElementById('s-ghtoken').value = tok;
+  if(gid) document.getElementById('s-gistid').value = gid;
+}
+
+// ═══════════════════════════════════════════════════
+//  GITHUB GIST SYNC
+// ═══════════════════════════════════════════════════
+const GF = 'bijli_data.json';
+function gcreds(){ return {tok:localStorage.getItem('gh_tok')||'', gid:localStorage.getItem('gh_gid')||''}; }
+
+async function gistPush(loud=true) {
+  const {tok,gid} = gcreds();
+  if(!tok) { if(loud) toast('Add GitHub token in Settings first','err'); return; }
+  const payload = JSON.stringify({bills,settings,ts:new Date().toISOString()},null,2);
+  try {
+    let res;
+    if(gid) {
+      res = await fetch(`https://api.github.com/gists/${gid}`,{method:'PATCH',headers:{'Authorization':'token '+tok,'Content-Type':'application/json'},body:JSON.stringify({files:{[GF]:{content:payload}}})});
+    } else {
+      res = await fetch('https://api.github.com/gists',{method:'POST',headers:{'Authorization':'token '+tok,'Content-Type':'application/json'},body:JSON.stringify({description:'Bijli Tracker Data',public:false,files:{[GF]:{content:payload}}})});
+    }
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if(!gid && data.id) { localStorage.setItem('gh_gid',data.id); document.getElementById('s-gistid').value = data.id; }
+    if(loud) toast('☁️ Pushed to GitHub Gist');
+    gistMsg('✅ Synced to GitHub Gist','green');
+  } catch(e) { if(loud) toast('Push failed: '+e.message,'err'); }
+}
+
+async function gistPull(silent=false) {
+  const {tok,gid} = gcreds();
+  if(!tok||!gid) { if(!silent) toast('Configure GitHub token + Gist ID first','err'); return; }
+  try {
+    const res = await fetch(`https://api.github.com/gists/${gid}`,{headers:{'Authorization':'token '+tok}});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const file = data.files?.[GF]; if(!file?.content) throw new Error('File not found');
+    const parsed = JSON.parse(file.content);
+    if(parsed.bills) bills = parsed.bills;
+    if(parsed.settings) settings = {...settings,...parsed.settings};
+    saveLocalOnly(); autoDiscoverAccounts(); updateAccSwitcher(); renderAll(); loadSettingsUI();
+    if(!silent) toast('☁️ Pulled from GitHub Gist');
+  } catch(e) { if(!silent) toast('Pull failed: '+e.message,'err'); }
+}
+
+async function saveGistConfig() {
+  const tok = document.getElementById('s-ghtoken').value.trim();
+  const gid = document.getElementById('s-gistid').value.trim();
+  if(!tok) { gistMsg('❌ Enter your GitHub token','red'); return; }
+  gistMsg('Testing token…','green');
+  try {
+    const r = await fetch('https://api.github.com/user',{headers:{'Authorization':'token '+tok}});
+    if(!r.ok) throw new Error('Invalid token');
+    const u = await r.json();
+    localStorage.setItem('gh_tok',tok);
+    if(gid) localStorage.setItem('gh_gid',gid);
+    gistMsg(`✅ Connected as @${u.login}${gid?'. Gist ID saved.':'. Will auto-create Gist on first push.'}`, 'green');
+    toast(`Connected as @${u.login}`);
+  } catch(e) { gistMsg('❌ Token invalid or no gist permission','red'); }
+}
+
+function gistMsg(msg,color) {
+  const el = document.getElementById('gist-msg'); if(!el) return;
+  el.style.display='block';
+  el.style.background = color==='green'?'rgba(16,185,129,.1)':'rgba(244,63,94,.1)';
+  el.style.border = `1px solid rgba(${color==='green'?'16,185,129':'244,63,94'},.25)`;
+  el.style.color = color==='green'?'var(--em)':'var(--rose)';
+  el.textContent = msg;
+}
+
+// ═══════════════════════════════════════════════════
+//  EXPORT / IMPORT
+// ═══════════════════════════════════════════════════
+function exportJSON() {
+  const a = document.createElement('a');
+  a.href = 'data:application/json,'+encodeURIComponent(JSON.stringify({bills,settings},null,2));
+  a.download = `bijli_backup_${new Date().toISOString().slice(0,10)}.json`; a.click();
+}
+function importJSON(inp) {
+  const fr = new FileReader();
+  fr.onload = e => { try { const d=JSON.parse(e.target.result); if(d.bills)bills=d.bills; if(d.settings)settings={...settings,...d.settings}; saveLocal(); init(); toast('✅ Data restored'); } catch{ toast('Invalid file','err'); } };
+  if(inp.files[0]) fr.readAsText(inp.files[0]);
+}
+function exportCSV() {
+  const a = getActiveBills();
+  if(!a.length) { toast('No bills to export','err'); return; }
+  const cols = ['bill_month','account_number','total_units_consumed','bill_days','current_reading_ph1','previous_reading_ph1','fixed_charge','energy_charge','subsidy_free_units','current_bill_amount','amount_due_by_date','due_date','solar_current_balance','power_factor','prev_payment_amount','prev_payment_date'];
+  const csv = [cols.join(','), ...a.map(b=>cols.map(c=>(b[c]??'')).join(','))].join('\n');
+  const el = document.createElement('a'); el.href='data:text/csv,'+encodeURIComponent(csv); el.download='bijli_bills.csv'; el.click();
+}
+function clearData() {
+  if(!confirm('Clear ALL bills and settings? Cannot be undone!')) return;
+  bills=[]; settings={accounts:[],slab1:100,rate1:6.10,rate2:6.95,fixed:40,rate:7.30,dark:settings.dark};
+  localStorage.removeItem(SK); localStorage.removeItem(SS); init(); toast('All data cleared');
+}
+
+// ═══════════════════════════════════════════════════
+//  MODALS & TOAST
+// ═══════════════════════════════════════════════════
+function openModal(id){ document.getElementById(id).style.display='flex'; }
+function closeModal(id){ document.getElementById(id).style.display='none'; }
+document.querySelectorAll('.modal-ov').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.style.display='none';}));
+
+function toast(msg,type='ok') {
+  const el = document.getElementById('toast');
+  document.getElementById('tmsg').textContent = msg;
+  el.style.background = type==='err' ? '#dc2626' : (settings.dark?'#334155':'#0f172a');
+  const ic = el.querySelector('i');
+  ic.className = type==='err' ? 'fa-solid fa-circle-xmark' : 'fa-solid fa-circle-check';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove('show'), 3500);
+}
+
+// ═══════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════
+function famt(v) {
+  const n = parseFloat(v)||0;
+  return n < 0 ? `-₹${Math.abs(n)}` : `₹${n}`;
+}
+
 init();
 </script>
 </body>
