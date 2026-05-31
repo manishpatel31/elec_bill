@@ -1729,13 +1729,37 @@ async function gistPushSolar() {
 }
 
 // ═══════════════════════════════════════════════════
+//  SOLAR REPORT TYPE TOGGLE
+// ═══════════════════════════════════════════════════
+let _solReportType = 'monthly';
+let _annualParsed  = null;
+
+function setReportType(type) {
+  _solReportType = type;
+  const isAnnual = type === 'annual';
+  const mBtn = document.getElementById('rt-monthly');
+  const aBtn = document.getElementById('rt-annual');
+  if(mBtn) { mBtn.style.background = isAnnual?'transparent':'white'; mBtn.style.color = isAnnual?'var(--muted)':'var(--volt-d)'; mBtn.style.boxShadow = isAnnual?'none':'0 1px 4px rgba(0,0,0,.1)'; }
+  if(aBtn) { aBtn.style.background = isAnnual?'white':'transparent'; aBtn.style.color = isAnnual?'var(--volt-d)':'var(--muted)'; aBtn.style.boxShadow = isAnnual?'0 1px 4px rgba(0,0,0,.1)':'none'; }
+  const hint = document.getElementById('rt-hint');
+  if(hint) hint.innerHTML = isAnnual
+    ? '📆 <b>Annual report</b> — authoritative month-by-month totals. Corrects gaps from offline days in monthly reports.'
+    : '📅 <b>Monthly report</b> — day-by-day data. Offline days show 0, but the header monthly total is always correct.';
+  const title = document.getElementById('sol-drop-title');
+  if(title) title.textContent = isAnnual ? 'Drop Annual XLS here or click to browse' : 'Drop Monthly XLS here or click to browse';
+  const sub = document.getElementById('sol-drop-sub');
+  if(sub) sub.textContent = isAnnual ? 'Annual Power Generation Report · .xls / .xlsx' : 'Monthly Power Generation Report · .xls / .xlsx';
+  cancelAnnualPreview();
+}
+
+// ═══════════════════════════════════════════════════
 //  SOLAR XLS DROP ZONE
 // ═══════════════════════════════════════════════════
 function solDragOver(e)  { e.preventDefault(); document.getElementById('sol-dropzone').style.background='rgba(234,179,8,.1)'; }
 function solDragLeave()  { document.getElementById('sol-dropzone').style.background='rgba(234,179,8,.03)'; }
 function solDrop(e) {
   e.preventDefault();
-  document.getElementById('sol-dropzone').style.background='rgba(234,179,8,.03)';
+  document.getElementById('sol-dropzone').style.background = 'rgba(234,179,8,.03)';
   const f = e.dataTransfer.files[0];
   if(f) solHandleFile(f);
 }
@@ -1743,29 +1767,38 @@ function solDrop(e) {
 async function solHandleFile(file) {
   if(!file) return;
   const ext = file.name.split('.').pop().toLowerCase();
-  if(!['xls','xlsx','csv'].includes(ext)) { solErr('Use an XLS, XLSX, or CSV file.'); return; }
+  if(!['xls','xlsx','csv'].includes(ext)) { solErr('Use an XLS or XLSX file exported from your solar app.'); return; }
 
-  document.getElementById('sol-dropzone').style.display = 'none';
-  document.getElementById('sol-proc').style.display = 'block';
-  document.getElementById('sol-err').style.display  = 'none';
+  document.getElementById('sol-dropzone').style.display  = 'none';
+  document.getElementById('sol-proc').style.display      = 'block';
+  document.getElementById('sol-err').style.display       = 'none';
+  const pm = document.getElementById('sol-proc-msg');
+  if(pm) pm.textContent = _solReportType === 'annual' ? 'Parsing annual report…' : 'Parsing monthly report…';
 
   try {
-    const report = await parseSolarXLS(file);
-    solarReports = solarReports.filter(r => r.report_month !== report.report_month); // replace if same month
-    solarReports.push(report);
-    solarReports.sort((a,b) => sortM(a.report_month) - sortM(b.report_month));
-    saveSolarLocal();
-    document.getElementById('sol-dropzone').style.display = 'block';
-    document.getElementById('sol-proc').style.display = 'none';
-    // Auto-select this month
-    const sel = document.getElementById('sol-month-sel');
-    if(sel) { sel.value = report.report_month; }
-    renderSolar();
-    toast(`✅ ${report.report_month} report imported — ${report.monthly_energy_kwh} kWh`);
+    if(_solReportType === 'annual') {
+      const data = await parseAnnualXLS(file);
+      document.getElementById('sol-dropzone').style.display = 'block';
+      document.getElementById('sol-proc').style.display     = 'none';
+      showAnnualPreview(data);
+    } else {
+      const report = await parseMonthlyXLS(file);
+      document.getElementById('sol-dropzone').style.display = 'block';
+      document.getElementById('sol-proc').style.display     = 'none';
+      solarReports = solarReports.filter(r => r.report_month !== report.report_month);
+      solarReports.push(report);
+      solarReports.sort((a,b) => sortM(a.report_month) - sortM(b.report_month));
+      saveSolarLocal();
+      const sel = document.getElementById('sol-month-sel');
+      if(sel) sel.value = report.report_month;
+      renderSolar();
+      const gapNote = report.has_network_gap ? ` (⚠️ ${report.network_gap_kwh} kWh gap detected — upload Annual report to correct)` : '';
+      toast('✅ ' + report.report_month + ' imported — ' + report.monthly_energy_kwh + ' kWh' + gapNote);
+    }
   } catch(e) {
     document.getElementById('sol-dropzone').style.display = 'block';
-    document.getElementById('sol-proc').style.display = 'none';
-    solErr('Parse failed: ' + e.message);
+    document.getElementById('sol-proc').style.display     = 'none';
+    solErr('Parse failed: ' + (e.message||'Unknown error'));
     console.error('Solar parse error:', e);
   }
 }
@@ -1776,98 +1809,197 @@ function solErr(msg) {
 }
 
 // ═══════════════════════════════════════════════════
-//  SOLAR XLS PARSER
+//  MONTHLY XLS PARSER
 // ═══════════════════════════════════════════════════
-async function parseSolarXLS(file) {
-  const buf  = await file.arrayBuffer();
-  const wb   = XLSX.read(buf, { type:'array' });
-  const ws   = wb.Sheets[wb.SheetNames[0]];
-  const raw  = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+async function parseMonthlyXLS(file) {
+  const buf = await file.arrayBuffer();
+  const wb  = XLSX.read(buf, {type:'array'});
+  const ws  = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
 
-  // Find the data row (row with a numeric "No." = 1 at start)
-  let dataRow = null, headerRow = null, dayNumRow = null;
+  let dataRow = null, dayNumRow = null;
   for(let i = 0; i < raw.length; i++) {
-    const r = raw[i];
-    if(String(r[0]).trim() === '1' || r[0] === 1) { dataRow = r; dayNumRow = raw[i-1]; headerRow = raw[i-2]; break; }
+    if(raw[i][0] === 1 || String(raw[i][0]).trim() === '1') {
+      dataRow = raw[i]; dayNumRow = raw[i-1]; break;
+    }
   }
-  if(!dataRow) throw new Error('Could not find plant data row. Make sure this is the correct XLS format.');
+  if(!dataRow) throw new Error('Cannot find plant data row. Is this a Monthly report?');
 
-  // Extract summary info from header rows
-  const allText = raw.map(r => r.join(' ')).join('\n');
+  const allText   = raw.map(r => r.join(' ')).join('\n');
+  const plantName = String(dataRow[1]||'PLANT').trim();
 
-  // Plant name — cell[1] of data row
-  const plantName = String(dataRow[1] || 'PLANT').trim();
+  const mM = allText.match(/(\d{4})-(\d{1,2})\b/);
+  const MNS = ['','JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const reportMonth = mM ? (MNS[parseInt(mM[2])]||'')  + '-' + mM[1] : 'UNKNOWN';
 
-  // Report month — look for "YYYY-M" pattern in header
-  const monthMatch = allText.match(/(\d{4})-(\d{1,2})\b/);
-  let reportMonth = 'UNKNOWN';
-  if(monthMatch) {
-    const moNames = ['','JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-    reportMonth = (moNames[parseInt(monthMatch[2])]||'') + '-' + monthMatch[1];
-  }
-
-  // Design power, cumulative, monthly energy, monthly gain
   const designPower   = parseFloat(dataRow[7])  || 0;
   const cumulative    = parseFloat(dataRow[8])  || 0;
   const monthlyGain   = parseFloat(dataRow[9])  || 0;
   const monthlyEnergy = parseFloat(dataRow[10]) || 0;
+  const location      = String(dataRow[3]||'').trim();
+  const installDate   = String(dataRow[4]||'').trim();
 
-  // Location & installation date from data row cols 3,4
-  const location      = String(dataRow[3] || '').trim();
-  const installDate   = String(dataRow[4] || '').trim();
+  // Authoritative total from header row
+  let authoritative = monthlyEnergy;
+  const hM = allText.match(/Total plants [Mm]onthly energy generation[^\d]*(\d+\.\d+)/);
+  if(hM) authoritative = parseFloat(hM[1]) || monthlyEnergy;
 
-  // Total monthly energy from header (row 1 usually has it)
-  let totalMonthly = monthlyEnergy;
-  const totMatch = allText.match(/monthly energy generation[：:]\s*([\d.]+)/i);
-  if(totMatch) totalMonthly = parseFloat(totMatch[1]) || monthlyEnergy;
-
-  // Extract daily generation values
-  // Day numbers are in dayNumRow starting from col 10
-  // Values are in dataRow from col 10 onwards
-  const daily = {};
-  if(dayNumRow && dataRow) {
-    for(let c = 10; c < Math.min(dataRow.length, dayNumRow.length); c++) {
-      const dayNum = parseInt(dayNumRow[c]);
-      const val    = parseFloat(dataRow[c]);
-      if(dayNum >= 1 && dayNum <= 31 && !isNaN(val)) {
-        daily[dayNum] = val;
-      }
+  // Daily values
+  const daily = {}; let dailySum = 0;
+  if(dayNumRow) {
+    for(let c = 10; c < Math.min(dataRow.length, 50); c++) {
+      const dn = parseInt(dayNumRow[c]); const v = parseFloat(dataRow[c]);
+      if(dn >= 1 && dn <= 31 && !isNaN(v)) { daily[dn] = v; dailySum += v; }
     }
   }
+  dailySum = parseFloat(dailySum.toFixed(2));
+  const gap     = parseFloat((authoritative - dailySum).toFixed(2));
+  const hasGap  = gap > 0.5;
+  const gapDays = Object.entries(daily).filter(([,v])=>v===0).map(([d])=>parseInt(d));
 
-  // Compute stats
-  const dayVals    = Object.values(daily).filter(v => v > 0);
-  const zeroDays   = Object.values(daily).filter(v => v === 0).length;
+  const dayVals    = Object.values(daily).filter(v=>v>0);
   const peakVal    = dayVals.length ? Math.max(...dayVals) : 0;
-  const peakDay    = Object.entries(daily).find(([,v]) => v === peakVal)?.[0] || '—';
-  const avgDaily   = dayVals.length ? (dayVals.reduce((s,v)=>s+v,0)/dayVals.length).toFixed(1) : 0;
-  const activeDays = dayVals.length;
-
-  // PR — Performance Ratio: actual / (design_power × peak_sun_hours × days)
-  // Assume ~5.5 peak sun hours for Patna
-  const peakSunHrs = 5.5;
-  const theoreticalMax = designPower * peakSunHrs * activeDays;
-  const pr = theoreticalMax > 0 ? ((totalMonthly / theoreticalMax) * 100).toFixed(1) : 0;
+  const peakDay    = dayVals.length ? parseInt(Object.entries(daily).find(([,v])=>v===peakVal)?.[0]||0) : 0;
+  const avgDaily   = dayVals.length ? parseFloat((dayVals.reduce((s,v)=>s+v,0)/dayVals.length).toFixed(2)) : 0;
+  const pr         = (designPower * 5.5 * dayVals.length) > 0
+    ? parseFloat(((authoritative / (designPower * 5.5 * dayVals.length))*100).toFixed(1)) : 0;
 
   return {
-    id: Date.now(),
-    saved_at: new Date().toISOString(),
-    report_month: reportMonth,
-    plant_name: plantName,
-    location,
-    installation_date: installDate,
-    design_power_kw: designPower,
-    monthly_energy_kwh: totalMonthly,
-    monthly_gain_inr: monthlyGain,
-    cumulative_kwh: cumulative,
-    daily_generation: daily,
-    peak_day: parseInt(peakDay),
-    peak_kwh: peakVal,
-    avg_daily_kwh: parseFloat(avgDaily),
-    active_days: activeDays,
-    zero_days: zeroDays,
-    performance_ratio_pct: parseFloat(pr),
+    id: Date.now()+Math.random(), saved_at: new Date().toISOString(), source:'monthly_xls',
+    report_month: reportMonth, plant_name: plantName, location, installation_date: installDate,
+    design_power_kw: designPower, monthly_energy_kwh: authoritative, daily_sum_kwh: dailySum,
+    has_network_gap: hasGap, network_gap_kwh: hasGap ? gap : 0, gap_days: gapDays,
+    monthly_gain_inr: monthlyGain, cumulative_kwh: cumulative, daily_generation: daily,
+    peak_day: peakDay, peak_kwh: peakVal, avg_daily_kwh: avgDaily,
+    active_days: dayVals.length, zero_days: gapDays.length,
+    performance_ratio_pct: pr, annual_corrected: false,
   };
+}
+
+// ═══════════════════════════════════════════════════
+//  ANNUAL XLS PARSER
+// ═══════════════════════════════════════════════════
+async function parseAnnualXLS(file) {
+  const buf = await file.arrayBuffer();
+  const wb  = XLSX.read(buf, {type:'array'});
+  const ws  = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+  let dataRow = null;
+  for(let i = 0; i < raw.length; i++) {
+    if(raw[i][0] === 1 || String(raw[i][0]).trim() === '1') { dataRow = raw[i]; break; }
+  }
+  if(!dataRow) throw new Error('Cannot find plant data row. Is this an Annual report?');
+
+  const allText     = raw.map(r=>r.join(' ')).join('\n');
+  const plantName   = String(dataRow[1]||'PLANT').trim();
+  const location    = String(dataRow[3]||'').trim();
+  const installDate = String(dataRow[4]||'').trim();
+  const designPower = parseFloat(dataRow[6]) || 0;
+  const cumulative  = parseFloat(dataRow[7]) || 0;
+  const yearGain    = parseFloat(dataRow[8]) || 0;
+  const yearEnergy  = parseFloat(dataRow[9]) || 0;
+
+  const yearM  = allText.match(/Export time[^0-9]*(\d{4})/)||allText.match(/\b(20\d{2})\b/);
+  const yearNum = yearM ? yearM[1] : String(new Date().getFullYear());
+
+  // Monthly totals: cols 10–21 → Jan–Dec
+  const MNS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const monthly = {};
+  for(let c = 10; c <= 21 && c < dataRow.length; c++) {
+    const v = parseFloat(dataRow[c]);
+    if(!isNaN(v) && v > 0) monthly[MNS[c-10]+'-'+yearNum] = parseFloat(v.toFixed(2));
+  }
+
+  return { plant_name:plantName, location, installation_date:installDate,
+    design_power_kw:designPower, cumulative_kwh:cumulative,
+    year_energy_kwh:yearEnergy, year_gain_inr:yearGain,
+    year:parseInt(yearNum), monthly_totals:monthly };
+}
+
+// ═══════════════════════════════════════════════════
+//  ANNUAL PREVIEW & CORRECTION APPLY
+// ═══════════════════════════════════════════════════
+function showAnnualPreview(data) {
+  _annualParsed = data;
+  const preview = document.getElementById('annual-preview');
+  if(!preview) return;
+  preview.style.display = 'block';
+
+  const MNS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  let corrections = 0;
+
+  const gridHTML = MNS.map(mo => {
+    const key       = mo + '-' + data.year;
+    const annualKwh = data.monthly_totals[key];
+    if(!annualKwh) return `<div style="padding:10px;background:var(--s50);border-radius:10px;border:1px solid var(--border);opacity:.4;text-align:center"><div style="font-size:10px;font-weight:800;color:var(--muted)">${mo}</div><div style="font-size:12px;font-weight:700;color:var(--muted)">—</div></div>`;
+    const existing    = solarReports.find(r => r.report_month === key);
+    const existingKwh = existing?.monthly_energy_kwh || 0;
+    const hasDiff     = existing && Math.abs(annualKwh - existingKwh) > 0.1;
+    if(hasDiff) corrections++;
+    const c = !existing ? 'var(--sky)' : hasDiff ? 'var(--volt-d)' : 'var(--em)';
+    const lbl = !existing ? 'NEW' : hasDiff ? 'WAS '+existingKwh : '✓ OK';
+    return `<div style="padding:10px;background:var(--s50);border-radius:10px;border:1px solid var(--border);text-align:center">
+      <div style="font-size:10px;font-weight:800;color:var(--muted)">${mo}</div>
+      <div style="font-size:15px;font-weight:800;color:${c}">${annualKwh}</div>
+      <div style="font-size:9px;font-weight:800;color:${c};opacity:.85">${lbl}</div></div>`;
+  }).join('');
+  document.getElementById('annual-preview-grid').innerHTML = gridHTML;
+
+  const banner = document.getElementById('annual-correction-banner');
+  const msg    = document.getElementById('annual-corr-msg');
+  if(banner) banner.style.display = corrections > 0 ? 'block' : 'none';
+  if(msg && corrections > 0) msg.textContent = corrections + ' month(s) have discrepancies caused by offline/network days. Applying will correct totals to the authoritative annual figures.';
+}
+
+function cancelAnnualPreview() {
+  _annualParsed = null;
+  const el = document.getElementById('annual-preview');
+  if(el) el.style.display = 'none';
+}
+
+function applyAnnualReport() {
+  if(!_annualParsed) return;
+  const data = _annualParsed;
+  const MNS  = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  let created = 0, corrected = 0;
+
+  MNS.forEach(mo => {
+    const key       = mo + '-' + data.year;
+    const annualKwh = data.monthly_totals[key];
+    if(!annualKwh) return;
+
+    const existing = solarReports.find(r => r.report_month === key);
+    if(existing) {
+      if(Math.abs(annualKwh - existing.monthly_energy_kwh) > 0.1) {
+        const oldKwh = existing.monthly_energy_kwh;
+        existing.monthly_energy_kwh      = annualKwh;
+        existing.annual_corrected        = true;
+        existing.annual_corrected_from   = oldKwh;
+        const gap = parseFloat((annualKwh - (existing.daily_sum_kwh||0)).toFixed(2));
+        existing.has_network_gap  = gap > 0.5;
+        existing.network_gap_kwh  = gap > 0.5 ? gap : 0;
+        corrected++;
+      }
+    } else {
+      solarReports.push({
+        id: Date.now()+Math.random(), saved_at: new Date().toISOString(), source:'annual_xls',
+        report_month: key, plant_name: data.plant_name, location: data.location,
+        installation_date: data.installation_date, design_power_kw: data.design_power_kw,
+        cumulative_kwh: data.cumulative_kwh, monthly_energy_kwh: annualKwh,
+        daily_sum_kwh: 0, monthly_gain_inr: 0, daily_generation: {},
+        peak_day: 0, peak_kwh: 0, avg_daily_kwh: 0, active_days: 0,
+        zero_days: 0, has_network_gap: false, network_gap_kwh: 0, gap_days: [],
+        annual_corrected: false, performance_ratio_pct: 0,
+        note: 'Imported from annual report — no daily breakdown',
+      });
+      created++;
+    }
+  });
+
+  solarReports.sort((a,b) => sortM(a.report_month) - sortM(b.report_month));
+  saveSolarLocal(); cancelAnnualPreview(); renderSolar();
+  toast('✅ Annual applied — ' + created + ' new months, ' + corrected + ' corrected');
 }
 
 // ═══════════════════════════════════════════════════
@@ -1957,7 +2089,16 @@ function renderSolarStats(rep) {
   const vEl = document.getElementById('sol-val');   if(vEl) vEl.textContent = '₹'+(rep.monthly_gain_inr||Math.round(generated*rate));
   const sEl = document.getElementById('sol-self');  if(sEl) sEl.textContent = selfConsumed.toFixed(1);
   const eEl = document.getElementById('sol-export');if(eEl) eEl.textContent = exported;
-  const sEl2 = document.getElementById('sol-gen-sub'); if(sEl2) sEl2.textContent = `kWh · ${rep.active_days} active days`;
+  const sEl2 = document.getElementById('sol-gen-sub');
+  if(sEl2) {
+    if(rep.has_network_gap && !rep.annual_corrected) {
+      sEl2.innerHTML = `kWh <span style="font-size:9px;color:rgba(255,255,255,.7)">⚠️ +${rep.network_gap_kwh} kWh offline gap — upload Annual report to correct</span>`;
+    } else if(rep.annual_corrected) {
+      sEl2.innerHTML = `kWh <span style="font-size:9px;color:rgba(255,255,255,.7)">✏️ Corrected from ${rep.annual_corrected_from} kWh via annual report</span>`;
+    } else {
+      sEl2.textContent = `kWh · ${rep.active_days||0} active days`;
+    }
+  }
 }
 
 function renderDailyChart(rep) {
@@ -2052,6 +2193,17 @@ function renderSolarInsights(rep) {
   const rate   = settings.rate || 7.3;
 
   if(rep) {
+    // Network gap warning
+    if(rep.has_network_gap && !rep.annual_corrected) {
+      items.push({i:'📡',c:'rgba(234,179,8,.1)',tc:'var(--volt-d)',
+        t:`Network gap detected: ${rep.network_gap_kwh} kWh missing from daily data`,
+        d:`Daily readings sum to ${rep.daily_sum_kwh} kWh but monthly total is ${rep.monthly_energy_kwh} kWh. The ${rep.network_gap_kwh} kWh difference is from days when the plant was offline. Upload the Annual report to correct this.`});
+    } else if(rep.annual_corrected) {
+      items.push({i:'✏️',c:'rgba(14,165,233,.1)',tc:'var(--sky)',
+        t:`Corrected from annual report: was ${rep.annual_corrected_from} kWh → now ${rep.monthly_energy_kwh} kWh`,
+        d:`The difference of ${(rep.monthly_energy_kwh - rep.annual_corrected_from).toFixed(2)} kWh was generated on days when the monitoring system was offline.`});
+    }
+
     // Performance
     const pr = rep.performance_ratio_pct || 0;
     items.push({
@@ -2120,23 +2272,41 @@ function renderSolarHistory() {
   const tb = document.getElementById('sol-hist-body');
   if(!tb) return;
   if(!solarReports.length) {
-    tb.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);font-weight:700">No plant reports uploaded yet</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--muted);font-weight:700">No plant reports uploaded yet</td></tr>`;
     return;
   }
-  tb.innerHTML = [...solarReports].reverse().map(r =>
-    `<tr>
+  tb.innerHTML = [...solarReports].reverse().map(r => {
+    // Status badge
+    let statusBadge;
+    if(r.annual_corrected) {
+      statusBadge = `<span class="pill" style="background:rgba(14,165,233,.1);color:var(--sky)">✏️ Corrected<br><span style="font-size:8px">was ${r.annual_corrected_from} kWh</span></span>`;
+    } else if(r.has_network_gap) {
+      statusBadge = `<span class="pill" style="background:rgba(234,179,8,.1);color:var(--volt-d)">⚠️ Gap: ${r.network_gap_kwh} kWh<br><span style="font-size:8px">upload annual to fix</span></span>`;
+    } else if(r.source === 'annual_xls') {
+      statusBadge = `<span class="pill" style="background:rgba(139,92,246,.1);color:var(--vi)">📆 Annual</span>`;
+    } else {
+      statusBadge = `<span class="pill pgreen">✅ Complete</span>`;
+    }
+
+    const dailySumCell = r.daily_sum_kwh
+      ? `<span class="mono">${r.daily_sum_kwh}</span>${r.has_network_gap ? `<span style="font-size:9px;color:var(--volt-d);display:block">+${r.network_gap_kwh} offline</span>` : ''}`
+      : `<span style="color:var(--muted)">—</span>`;
+
+    return `<tr>
       <td><b>${r.report_month}</b></td>
-      <td>${r.plant_name}</td>
-      <td class="mono">${r.design_power_kw}</td>
+      <td>${r.plant_name||'—'}</td>
+      <td class="mono">${r.design_power_kw||'—'}</td>
       <td class="mono" style="color:var(--volt-d);font-weight:800">${r.monthly_energy_kwh.toFixed(1)}</td>
+      <td>${dailySumCell}</td>
+      <td>${statusBadge}</td>
       <td class="mono" style="color:var(--em)">₹${(r.monthly_gain_inr||0).toFixed(0)}</td>
-      <td class="mono">Day ${r.peak_day} · ${r.peak_kwh} kWh</td>
-      <td class="mono">${r.avg_daily_kwh} kWh</td>
-      <td class="mono" style="color:${r.zero_days>0?'var(--rose)':'var(--em)'}">${r.zero_days}</td>
-      <td class="mono">${r.cumulative_kwh.toLocaleString()}</td>
+      <td class="mono">${r.peak_day ? 'D'+r.peak_day+' · '+r.peak_kwh+' kWh' : '—'}</td>
+      <td class="mono">${r.avg_daily_kwh||'—'}</td>
+      <td class="mono" style="color:${r.zero_days>0?'var(--rose)':'var(--em)'}">${r.zero_days??'—'}</td>
+      <td class="mono">${r.cumulative_kwh?.toLocaleString()||'—'}</td>
       <td><button onclick="delSolarReport(${r.id})" style="background:none;border:none;color:var(--rose);cursor:pointer"><i class="fa-solid fa-trash"></i></button></td>
-    </tr>`
-  ).join('');
+    </tr>`;
+  }).join('');
 }
 
 function delSolarReport(id) {
