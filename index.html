@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if(typeof pdfjsLib!=='undefined') pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{--sky:#0ea5e9;--sky-d:#0284c7;--volt:#eab308;--volt-d:#a16207;--em:#10b981;--em-d:#059669;--rose:#f43f5e;--vi:#8b5cf6;--s50:#f8fafc;--s100:#f1f5f9;--s200:#e2e8f0;--s300:#cbd5e1;--s400:#94a3b8;--s500:#64748b;--s600:#475569;--s700:#334155;--s800:#1e293b;--s900:#0f172a;--bg:#f0f9ff;--card:#fff;--border:var(--s200);--txt:var(--s900);--muted:var(--s500);--r:18px}
 .dark{--bg:#020b18;--card:rgba(15,23,42,.9);--border:rgba(255,255,255,.07);--txt:#e2e8f0;--muted:#64748b;--s50:#0f172a;--s100:#1e293b;--s200:#334155}
@@ -440,19 +441,112 @@ input:checked+.tslider::before{transform:translateX(18px)}
 
 <!-- ══════════════════ SOLAR ══════════════════ -->
 <div id="tab-solar" class="tab">
-  <h2 style="font-size:1.2rem;font-weight:900;margin-bottom:16px">☀️ Solar Net Metering Tracker</h2>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <h2 style="font-size:1.2rem;font-weight:900">☀️ Solar Plant Dashboard</h2>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select id="sol-month-sel" onchange="renderSolar()" style="padding:6px 28px 6px 10px;border-radius:10px;border:1px solid var(--border);background:var(--s50);color:var(--txt);font-size:11px;font-weight:700;outline:none;font-family:inherit;appearance:none;background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%222%22%3E%3Cpolyline points=%226 9 12 15 18 9%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 8px center;background-size:12px"><option value="">All Months</option></select>
+    </div>
+  </div>
+
+  <!-- Upload Plant Report Card — dual mode -->
+  <div class="card" style="margin-bottom:18px;overflow:hidden;border:1.5px solid rgba(234,179,8,.3)">
+    <div style="background:linear-gradient(135deg,rgba(234,179,8,.12),rgba(249,115,22,.06));padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="width:36px;height:36px;background:linear-gradient(135deg,#eab308,#f97316);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 10px rgba(234,179,8,.3)">📊</div>
+      <div style="flex:1">
+        <h3 style="font-weight:900;font-size:.95rem">Upload Plant Generation Report</h3>
+        <p style="font-size:11px;color:var(--muted);font-weight:600">Monthly report (day-by-day) or Annual report (month-by-month totals) — both supported</p>
+      </div>
+      <!-- Report type toggle -->
+      <div style="display:flex;gap:6px;background:var(--s100);padding:4px;border-radius:10px">
+        <button id="rt-monthly" onclick="setReportType('monthly')" style="padding:5px 12px;border-radius:7px;border:none;font-size:11px;font-weight:800;cursor:pointer;background:white;color:var(--volt-d);box-shadow:0 1px 4px rgba(0,0,0,.1);font-family:inherit">📅 Monthly</button>
+        <button id="rt-annual"  onclick="setReportType('annual')"  style="padding:5px 12px;border-radius:7px;border:none;font-size:11px;font-weight:800;cursor:pointer;background:transparent;color:var(--muted);font-family:inherit">📆 Annual</button>
+      </div>
+    </div>
+
+    <!-- Hint bar — changes based on mode -->
+    <div id="rt-hint" style="padding:8px 20px;background:rgba(234,179,8,.06);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--volt-d)">
+      📅 <b>Monthly report</b> — contains day-by-day data. Note: days when plant was offline may show 0, but the monthly total is correct.
+    </div>
+
+    <div style="padding:16px 20px">
+      <label id="sol-dropzone" style="display:block;border:2px dashed rgba(234,179,8,.5);border-radius:12px;padding:24px 16px;text-align:center;cursor:pointer;background:rgba(234,179,8,.03);transition:all .2s" ondragover="solDragOver(event)" ondragleave="solDragLeave(event)" ondrop="solDrop(event)">
+        <input type="file" id="sol-file" accept=".xls,.xlsx,.csv" style="display:none" onchange="solHandleFile(this.files[0])">
+        <div style="font-size:2rem;margin-bottom:8px">📂</div>
+        <h4 style="font-weight:800;color:var(--volt-d);margin-bottom:3px" id="sol-drop-title">Drop Monthly XLS here or click to browse</h4>
+        <p style="font-size:11px;color:var(--muted);font-weight:600" id="sol-drop-sub">Exported from your solar monitoring app · .xls / .xlsx</p>
+      </label>
+
+      <!-- Processing spinner -->
+      <div id="sol-proc" style="display:none;text-align:center;padding:20px">
+        <div style="width:40px;height:40px;border-radius:50%;border:3px solid var(--volt);border-top-color:transparent;animation:spin 1s linear infinite;margin:0 auto 10px"></div>
+        <p style="font-weight:800;font-size:13px" id="sol-proc-msg">Parsing report…</p>
+      </div>
+
+      <!-- Annual correction preview (shown after annual parse) -->
+      <div id="annual-preview" style="display:none;margin-top:14px">
+        <div style="font-size:12px;font-weight:800;color:var(--volt-d);margin-bottom:10px">📆 Annual Report — Monthly Totals Detected</div>
+        <div id="annual-preview-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:12px"></div>
+        <div id="annual-correction-banner" style="padding:12px 14px;background:rgba(14,165,233,.07);border:1px solid rgba(14,165,233,.2);border-radius:10px;margin-bottom:12px;display:none">
+          <p style="font-size:12px;font-weight:800;color:var(--sky);margin-bottom:4px">🔧 Corrections available!</p>
+          <p style="font-size:11px;color:var(--muted);font-weight:600" id="annual-corr-msg"></p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="bprimary" onclick="applyAnnualReport()"><i class="fa-solid fa-rotate"></i> Apply Corrections & Import All Months</button>
+          <button class="bghost" onclick="cancelAnnualPreview()">Cancel</button>
+        </div>
+      </div>
+
+      <div id="sol-err" style="display:none;margin-top:10px;padding:9px 12px;border-radius:9px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);color:var(--rose);font-size:12px;font-weight:700"></div>
+    </div>
+  </div>
+
+  <!-- Plant Info Card -->
+  <div id="plant-info-card" style="display:none;margin-bottom:18px" class="card">
+    <div style="padding:14px 18px;background:linear-gradient(135deg,rgba(234,179,8,.1),rgba(249,115,22,.05));border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <h3 style="font-weight:900;font-size:.9rem">🏭 Plant Information</h3>
+    </div>
+    <div id="plant-info-body" style="padding:14px 18px"></div>
+  </div>
+
+  <!-- Summary stat cards -->
   <div class="grid4" style="margin-bottom:18px">
-    <div class="scard sc2"><div class="lbl">Current Balance</div><div class="val" id="sol-cur">—</div><div class="sub">units banked</div><div class="bg">☀️</div></div>
-    <div class="scard sc3"><div class="lbl">Est. Monthly Save</div><div class="val" id="sol-save">—</div><div class="sub">₹ per month</div><div class="bg">💰</div></div>
-    <div class="scard sc1"><div class="lbl">Peak Month</div><div class="val" id="sol-peak">—</div><div class="sub" id="sol-peak-mo">units</div><div class="bg">🏆</div></div>
-    <div class="scard sc5"><div class="lbl">Avg Supply</div><div class="val" id="sol-hrs">—</div><div class="sub">hours/day</div><div class="bg">⏱️</div></div>
+    <div class="scard sc2"><div class="lbl">Generated This Month</div><div class="val" id="sol-gen">—</div><div class="sub" id="sol-gen-sub">kWh</div><div class="bg">⚡</div></div>
+    <div class="scard sc3"><div class="lbl">Financial Value</div><div class="val" id="sol-val">—</div><div class="sub">₹ this month</div><div class="bg">💰</div></div>
+    <div class="scard sc1"><div class="lbl">Self Consumed</div><div class="val" id="sol-self">—</div><div class="sub">kWh (not exported)</div><div class="bg">🏠</div></div>
+    <div class="scard sc5"><div class="lbl">Exported to Grid</div><div class="val" id="sol-export">—</div><div class="sub">units net metered</div><div class="bg">🔌</div></div>
   </div>
+
+  <!-- Charts Row 1 -->
+  <div class="chart-wrap">
+    <div class="ctitle">
+      ☀️ Daily Generation — <span id="sol-chart-month">—</span>
+      <span id="sol-peak-badge" style="font-size:10px;font-weight:700;color:var(--muted)"></span>
+    </div>
+    <canvas id="c-sol-daily" style="max-height:260px"></canvas>
+  </div>
+
   <div class="grid2">
-    <div class="chart-wrap"><div class="ctitle">☀️ Solar Balance Trend</div><canvas id="c-solar" style="max-height:240px"></canvas></div>
-    <div class="chart-wrap"><div class="ctitle">📊 Solar vs Total Consumption</div><canvas id="c-solar-pct" style="max-height:240px"></canvas></div>
+    <div class="chart-wrap"><div class="ctitle">📅 Monthly Generation Trend (kWh)</div><canvas id="c-sol-monthly" style="max-height:230px"></canvas></div>
+    <div class="chart-wrap"><div class="ctitle">⚖️ Generation vs Consumption vs Export</div><canvas id="c-sol-compare" style="max-height:230px"></canvas></div>
   </div>
-  <div class="sec">Solar Insights</div>
-  <div id="solar-insights" style="display:grid;gap:10px"></div>
+
+  <div class="grid2">
+    <div class="chart-wrap"><div class="ctitle">🏭 Plant Performance — Actual vs Design Capacity</div><canvas id="c-sol-perf" style="max-height:220px"></canvas></div>
+    <div class="chart-wrap"><div class="ctitle">☀️ Net Metering Balance (from Bills)</div><canvas id="c-solar" style="max-height:220px"></canvas></div>
+  </div>
+
+  <!-- Insights -->
+  <div class="sec" style="margin-top:4px">Solar Insights</div>
+  <div id="solar-insights" style="display:grid;gap:10px;margin-bottom:18px"></div>
+
+  <!-- Report history list -->
+  <div class="sec">Uploaded Plant Reports</div>
+  <div class="card" style="overflow-x:auto">
+    <table class="bill-table">
+      <thead><tr><th>Month</th><th>Plant</th><th>Design (kW)</th><th>Generated (kWh)</th><th>Daily Sum</th><th>Status</th><th>Value (₹)</th><th>Peak Day</th><th>Avg/Day</th><th>Zero Days</th><th>Cumulative (kWh)</th><th>Action</th></tr></thead>
+      <tbody id="sol-hist-body"></tbody>
+    </table>
+  </div>
 </div>
 
 <!-- ══════════════════ SETTINGS ══════════════════ -->
@@ -495,25 +589,6 @@ input:checked+.tslider::before{transform:translateX(18px)}
           <button class="bprimary" style="font-size:11px;padding:7px 14px" onclick="saveAIKey('groq')">Save</button>
           <button class="bghost" style="font-size:11px;padding:7px 10px" onclick="testAIKey('groq')">Test</button>
           <button class="bghost" style="font-size:11px;padding:7px 10px;color:var(--rose)" onclick="clearAIKey('groq')"><i class="fa-solid fa-trash"></i></button>
-        </div>
-      </div>
-
-      <!-- Gemini -->
-      <div style="padding:14px;background:var(--s50);border-radius:12px;border:1px solid var(--border);margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-          <div style="width:30px;height:30px;background:linear-gradient(135deg,#4285F4,#34A853);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px">✦</div>
-          <div>
-            <b style="font-size:13px">Google Gemini Flash</b>
-            <span class="pill psky" style="margin-left:6px">Free 1500 req/day</span>
-          </div>
-          <a href="https://aistudio.google.com/apikey" target="_blank" style="margin-left:auto;font-size:11px;font-weight:800;color:var(--sky);text-decoration:none">Get free key →</a>
-        </div>
-        <p style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:8px">Reads PDFs &amp; images natively without text extraction. 1 million tokens/day free.</p>
-        <div style="display:flex;gap:8px">
-          <input type="password" id="s-gemini" placeholder="AIzaSy_xxxxxxxxxxxxxxxxxxxx" style="flex:1;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--txt);font-size:12px;font-weight:600;outline:none;font-family:inherit">
-          <button class="bprimary" style="font-size:11px;padding:7px 14px" onclick="saveAIKey('gemini')">Save</button>
-          <button class="bghost" style="font-size:11px;padding:7px 10px" onclick="testAIKey('gemini')">Test</button>
-          <button class="bghost" style="font-size:11px;padding:7px 10px;color:var(--rose)" onclick="clearAIKey('gemini')"><i class="fa-solid fa-trash"></i></button>
         </div>
       </div>
 
@@ -1636,6 +1711,441 @@ function toast(msg,type='ok') {
 }
 
 // ═══════════════════════════════════════════════════
+//  SOLAR PLANT — STATE & STORAGE
+// ═══════════════════════════════════════════════════
+let solarReports = []; // separate from bills
+const SK_SOL = 'bt3_solar';
+
+function loadSolarLocal() {
+  try { const d = localStorage.getItem(SK_SOL); if(d) solarReports = JSON.parse(d); } catch(e){}
+}
+function saveSolarLocal() {
+  localStorage.setItem(SK_SOL, JSON.stringify(solarReports));
+  gistPushSolar();
+}
+async function gistPushSolar() {
+  // piggyback on gist push — include solar in main payload
+  // handled via overriding saveLocal to include solar
+}
+
+// ═══════════════════════════════════════════════════
+//  SOLAR XLS DROP ZONE
+// ═══════════════════════════════════════════════════
+function solDragOver(e)  { e.preventDefault(); document.getElementById('sol-dropzone').style.background='rgba(234,179,8,.1)'; }
+function solDragLeave()  { document.getElementById('sol-dropzone').style.background='rgba(234,179,8,.03)'; }
+function solDrop(e) {
+  e.preventDefault();
+  document.getElementById('sol-dropzone').style.background='rgba(234,179,8,.03)';
+  const f = e.dataTransfer.files[0];
+  if(f) solHandleFile(f);
+}
+
+async function solHandleFile(file) {
+  if(!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if(!['xls','xlsx','csv'].includes(ext)) { solErr('Use an XLS, XLSX, or CSV file.'); return; }
+
+  document.getElementById('sol-dropzone').style.display = 'none';
+  document.getElementById('sol-proc').style.display = 'block';
+  document.getElementById('sol-err').style.display  = 'none';
+
+  try {
+    const report = await parseSolarXLS(file);
+    solarReports = solarReports.filter(r => r.report_month !== report.report_month); // replace if same month
+    solarReports.push(report);
+    solarReports.sort((a,b) => sortM(a.report_month) - sortM(b.report_month));
+    saveSolarLocal();
+    document.getElementById('sol-dropzone').style.display = 'block';
+    document.getElementById('sol-proc').style.display = 'none';
+    // Auto-select this month
+    const sel = document.getElementById('sol-month-sel');
+    if(sel) { sel.value = report.report_month; }
+    renderSolar();
+    toast(`✅ ${report.report_month} report imported — ${report.monthly_energy_kwh} kWh`);
+  } catch(e) {
+    document.getElementById('sol-dropzone').style.display = 'block';
+    document.getElementById('sol-proc').style.display = 'none';
+    solErr('Parse failed: ' + e.message);
+    console.error('Solar parse error:', e);
+  }
+}
+
+function solErr(msg) {
+  const el = document.getElementById('sol-err');
+  if(el) { el.style.display='block'; el.textContent='❌ '+msg; }
+}
+
+// ═══════════════════════════════════════════════════
+//  SOLAR XLS PARSER
+// ═══════════════════════════════════════════════════
+async function parseSolarXLS(file) {
+  const buf  = await file.arrayBuffer();
+  const wb   = XLSX.read(buf, { type:'array' });
+  const ws   = wb.Sheets[wb.SheetNames[0]];
+  const raw  = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+
+  // Find the data row (row with a numeric "No." = 1 at start)
+  let dataRow = null, headerRow = null, dayNumRow = null;
+  for(let i = 0; i < raw.length; i++) {
+    const r = raw[i];
+    if(String(r[0]).trim() === '1' || r[0] === 1) { dataRow = r; dayNumRow = raw[i-1]; headerRow = raw[i-2]; break; }
+  }
+  if(!dataRow) throw new Error('Could not find plant data row. Make sure this is the correct XLS format.');
+
+  // Extract summary info from header rows
+  const allText = raw.map(r => r.join(' ')).join('\n');
+
+  // Plant name — cell[1] of data row
+  const plantName = String(dataRow[1] || 'PLANT').trim();
+
+  // Report month — look for "YYYY-M" pattern in header
+  const monthMatch = allText.match(/(\d{4})-(\d{1,2})\b/);
+  let reportMonth = 'UNKNOWN';
+  if(monthMatch) {
+    const moNames = ['','JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    reportMonth = (moNames[parseInt(monthMatch[2])]||'') + '-' + monthMatch[1];
+  }
+
+  // Design power, cumulative, monthly energy, monthly gain
+  const designPower   = parseFloat(dataRow[7])  || 0;
+  const cumulative    = parseFloat(dataRow[8])  || 0;
+  const monthlyGain   = parseFloat(dataRow[9])  || 0;
+  const monthlyEnergy = parseFloat(dataRow[10]) || 0;
+
+  // Location & installation date from data row cols 3,4
+  const location      = String(dataRow[3] || '').trim();
+  const installDate   = String(dataRow[4] || '').trim();
+
+  // Total monthly energy from header (row 1 usually has it)
+  let totalMonthly = monthlyEnergy;
+  const totMatch = allText.match(/monthly energy generation[：:]\s*([\d.]+)/i);
+  if(totMatch) totalMonthly = parseFloat(totMatch[1]) || monthlyEnergy;
+
+  // Extract daily generation values
+  // Day numbers are in dayNumRow starting from col 10
+  // Values are in dataRow from col 10 onwards
+  const daily = {};
+  if(dayNumRow && dataRow) {
+    for(let c = 10; c < Math.min(dataRow.length, dayNumRow.length); c++) {
+      const dayNum = parseInt(dayNumRow[c]);
+      const val    = parseFloat(dataRow[c]);
+      if(dayNum >= 1 && dayNum <= 31 && !isNaN(val)) {
+        daily[dayNum] = val;
+      }
+    }
+  }
+
+  // Compute stats
+  const dayVals    = Object.values(daily).filter(v => v > 0);
+  const zeroDays   = Object.values(daily).filter(v => v === 0).length;
+  const peakVal    = dayVals.length ? Math.max(...dayVals) : 0;
+  const peakDay    = Object.entries(daily).find(([,v]) => v === peakVal)?.[0] || '—';
+  const avgDaily   = dayVals.length ? (dayVals.reduce((s,v)=>s+v,0)/dayVals.length).toFixed(1) : 0;
+  const activeDays = dayVals.length;
+
+  // PR — Performance Ratio: actual / (design_power × peak_sun_hours × days)
+  // Assume ~5.5 peak sun hours for Patna
+  const peakSunHrs = 5.5;
+  const theoreticalMax = designPower * peakSunHrs * activeDays;
+  const pr = theoreticalMax > 0 ? ((totalMonthly / theoreticalMax) * 100).toFixed(1) : 0;
+
+  return {
+    id: Date.now(),
+    saved_at: new Date().toISOString(),
+    report_month: reportMonth,
+    plant_name: plantName,
+    location,
+    installation_date: installDate,
+    design_power_kw: designPower,
+    monthly_energy_kwh: totalMonthly,
+    monthly_gain_inr: monthlyGain,
+    cumulative_kwh: cumulative,
+    daily_generation: daily,
+    peak_day: parseInt(peakDay),
+    peak_kwh: peakVal,
+    avg_daily_kwh: parseFloat(avgDaily),
+    active_days: activeDays,
+    zero_days: zeroDays,
+    performance_ratio_pct: parseFloat(pr),
+  };
+}
+
+// ═══════════════════════════════════════════════════
+//  SOLAR TAB RENDER
+// ═══════════════════════════════════════════════════
+function renderSolar() {
+  // Populate month selector
+  const sel = document.getElementById('sol-month-sel');
+  if(sel && solarReports.length) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">All Months</option>' +
+      [...solarReports].reverse().map(r =>
+        `<option value="${r.report_month}">${r.report_month}</option>`).join('');
+    if(cur) sel.value = cur;
+    if(!sel.value) sel.value = solarReports[solarReports.length-1].report_month;
+  }
+
+  const selMonth  = sel?.value || '';
+  const latestRep = selMonth
+    ? solarReports.find(r => r.report_month === selMonth)
+    : solarReports[solarReports.length - 1];
+
+  // Plant info
+  renderPlantInfo(latestRep);
+
+  // Stat cards
+  renderSolarStats(latestRep);
+
+  // Daily chart
+  renderDailyChart(latestRep);
+
+  // Monthly trend
+  renderSolarMonthlyTrend();
+
+  // Comparison chart
+  renderSolarComparison();
+
+  // Performance
+  renderSolarPerf();
+
+  // Net metering balance from bills
+  renderNetMeteringChart();
+
+  // Insights
+  renderSolarInsights(latestRep);
+
+  // History table
+  renderSolarHistory();
+}
+
+function renderPlantInfo(rep) {
+  const card = document.getElementById('plant-info-card');
+  const body = document.getElementById('plant-info-body');
+  if(!card || !rep) { if(card) card.style.display='none'; return; }
+  card.style.display = 'block';
+  const fields = [
+    ['Plant Name', rep.plant_name],
+    ['Location', rep.location],
+    ['Installed', rep.installation_date],
+    ['Design Capacity', rep.design_power_kw + ' kW'],
+    ['Cumulative Total', rep.cumulative_kwh.toLocaleString() + ' kWh'],
+    ['Report Month', rep.report_month],
+  ].filter(([,v]) => v);
+  body.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+    ${fields.map(([l,v]) => `
+      <div><div style="font-size:9px;font-weight:800;text-transform:uppercase;color:var(--muted);margin-bottom:2px">${l}</div>
+      <div style="font-size:12px;font-weight:800">${v}</div></div>`).join('')}
+  </div>`;
+}
+
+function renderSolarStats(rep) {
+  if(!rep) {
+    ['sol-gen','sol-val','sol-self','sol-export'].forEach(id => {
+      const el = document.getElementById(id); if(el) el.textContent = '—';
+    });
+    return;
+  }
+  const generated = rep.monthly_energy_kwh || 0;
+  const rate      = settings.rate || 7.3;
+
+  // Match with bill for self-consumed vs exported
+  const billMatch = getActiveBills().find(b => b.bill_month === rep.report_month);
+  const exported  = billMatch?.solar_current_balance || 0;
+  const selfConsumed = Math.max(0, generated - exported);
+
+  const gEl = document.getElementById('sol-gen');   if(gEl) gEl.textContent = generated.toFixed(1);
+  const vEl = document.getElementById('sol-val');   if(vEl) vEl.textContent = '₹'+(rep.monthly_gain_inr||Math.round(generated*rate));
+  const sEl = document.getElementById('sol-self');  if(sEl) sEl.textContent = selfConsumed.toFixed(1);
+  const eEl = document.getElementById('sol-export');if(eEl) eEl.textContent = exported;
+  const sEl2 = document.getElementById('sol-gen-sub'); if(sEl2) sEl2.textContent = `kWh · ${rep.active_days} active days`;
+}
+
+function renderDailyChart(rep) {
+  const badge = document.getElementById('sol-peak-badge');
+  const chartMonth = document.getElementById('sol-chart-month');
+  if(!rep) {
+    if(chartMonth) chartMonth.textContent = 'No data';
+    return;
+  }
+  if(chartMonth) chartMonth.textContent = rep.report_month;
+  if(badge) badge.textContent = `Peak: Day ${rep.peak_day} = ${rep.peak_kwh} kWh  ·  Avg: ${rep.avg_daily_kwh} kWh/day`;
+
+  const days   = Array.from({length:31},(_,i)=>i+1);
+  const values = days.map(d => rep.daily_generation[d] ?? 0);
+  const colors = values.map((v,i) => {
+    if(v === 0)       return 'rgba(148,163,184,.3)';
+    if(v === rep.peak_kwh) return '#f97316';
+    if(v < rep.avg_daily_kwh * 0.6) return 'rgba(244,63,94,.7)';
+    return 'rgba(234,179,8,.8)';
+  });
+
+  drawChart('c-sol-daily','bar',days.map(d=>'D'+d),[{
+    data:values, label:'kWh',
+    backgroundColor:colors,
+    borderRadius:5, borderSkipped:false,
+  }],{y:{beginAtZero:true}},{
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>`Day ${ctx.label.slice(1)}: ${ctx.parsed.y} kWh`}}
+    }
+  });
+}
+
+function renderSolarMonthlyTrend() {
+  if(!solarReports.length) return;
+  const labels = solarReports.map(r=>r.report_month.slice(0,3)+' '+r.report_month.slice(-2));
+  const data   = solarReports.map(r=>r.monthly_energy_kwh);
+  const gains  = solarReports.map(r=>r.monthly_gain_inr||0);
+
+  drawChart('c-sol-monthly','bar',labels,[
+    {data,label:'Generated (kWh)',backgroundColor:'rgba(234,179,8,.75)',borderRadius:6,borderSkipped:false,yAxisID:'y'},
+  ],{y:{beginAtZero:true,title:{display:true,text:'kWh',color:tc()}}});
+}
+
+function renderSolarComparison() {
+  const allBills = getActiveBills();
+  const months = solarReports.map(r => r.report_month);
+  if(!months.length) return;
+
+  const labels   = months.map(m => m.slice(0,3)+' '+m.slice(-2));
+  const generated = solarReports.map(r => r.monthly_energy_kwh);
+  const consumed  = months.map(m => allBills.find(b=>b.bill_month===m)?.total_units_consumed || 0);
+  const exported  = months.map(m => allBills.find(b=>b.bill_month===m)?.solar_current_balance || 0);
+  const selfUsed  = solarReports.map((r,i) => Math.max(0, r.monthly_energy_kwh - (exported[i]||0)));
+
+  drawChart('c-sol-compare','bar',labels,[
+    {label:'Consumed (kWh)',   data:consumed,  backgroundColor:'rgba(99,102,241,.65)', borderRadius:5,borderSkipped:false},
+    {label:'Self-consumed (kWh)', data:selfUsed, backgroundColor:'rgba(234,179,8,.8)',  borderRadius:5,borderSkipped:false},
+    {label:'Exported/Banked',  data:exported,  backgroundColor:'rgba(16,185,129,.75)', borderRadius:5,borderSkipped:false},
+  ],{y:{beginAtZero:true}});
+}
+
+function renderSolarPerf() {
+  if(!solarReports.length) return;
+  const labels = solarReports.map(r=>r.report_month.slice(0,3)+' '+r.report_month.slice(-2));
+  const pr     = solarReports.map(r=>r.performance_ratio_pct||0);
+
+  drawChart('c-sol-perf','line',labels,[
+    {data:pr,label:'PR %',borderColor:'#f97316',backgroundColor:'rgba(249,115,22,.1)',
+     fill:true,tension:.4,pointRadius:5,pointBackgroundColor:pr.map(v=>v>=75?'#10b981':'#f43f5e'),borderWidth:2},
+    {data:labels.map(()=>75),label:'Target 75%',borderColor:'rgba(16,185,129,.5)',
+     borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false}
+  ],{y:{min:0,max:100,title:{display:true,text:'Performance Ratio %',color:tc()}}});
+}
+
+function renderNetMeteringChart() {
+  const all = getActiveBills();
+  if(!all.length) return;
+  const last12 = all.slice(-12);
+  const labels = last12.map(b=>b.bill_month?.slice(0,3)||'?');
+  const solData = last12.map(b=>b.solar_current_balance||0);
+  drawChart('c-solar','bar',labels,[{
+    data:solData,label:'Net Metered Units',
+    backgroundColor:solData.map((_,i)=>i===solData.length-1?'#10b981':'rgba(16,185,129,.5)'),
+    borderRadius:7,borderSkipped:false,
+  }],{y:{beginAtZero:true}});
+}
+
+function renderSolarInsights(rep) {
+  const allBills = getActiveBills();
+  const items = [];
+  const rate   = settings.rate || 7.3;
+
+  if(rep) {
+    // Performance
+    const pr = rep.performance_ratio_pct || 0;
+    items.push({
+      i: pr >= 75 ? '✅' : '⚠️',
+      c: pr >= 75 ? 'rgba(16,185,129,.1)' : 'rgba(244,63,94,.1)',
+      tc: pr >= 75 ? 'var(--em)' : 'var(--rose)',
+      t: `Performance Ratio: ${pr}% ${pr>=75?'(Good)':'(Below target)'}`,
+      d: `Expected ~75%+ for Patna. Your plant generated ${rep.monthly_energy_kwh} kWh vs theoretical max.`
+    });
+
+    // Zero days
+    if(rep.zero_days > 0) {
+      items.push({i:'☁️',c:'rgba(148,163,184,.1)',tc:'var(--muted)',
+        t:`${rep.zero_days} zero-generation days in ${rep.report_month}`,
+        d:`Days with 0 kWh likely due to grid outage, maintenance, or weather. Check inverter logs.`});
+    }
+
+    // Peak day
+    items.push({i:'🏆',c:'rgba(234,179,8,.1)',tc:'var(--volt-d)',
+      t:`Peak: Day ${rep.peak_day} — ${rep.peak_kwh} kWh (${(rep.peak_kwh/rep.design_power_kw*100/5.5).toFixed(0)}% capacity utilisation)`,
+      d:`Average was ${rep.avg_daily_kwh} kWh/day across ${rep.active_days} active days.`});
+
+    // Bill comparison
+    const billMatch = allBills.find(b => b.bill_month === rep.report_month);
+    if(billMatch) {
+      const exported = billMatch.solar_current_balance || 0;
+      const selfConsumed = Math.max(0, rep.monthly_energy_kwh - exported);
+      const selfPct = rep.monthly_energy_kwh > 0 ? (selfConsumed/rep.monthly_energy_kwh*100).toFixed(0) : 0;
+      items.push({i:'🔌',c:'rgba(14,165,233,.1)',tc:'var(--sky)',
+        t:`${selfPct}% self-consumed, ${(100-parseInt(selfPct))}% exported`,
+        d:`${selfConsumed.toFixed(1)} kWh used directly at home, ${exported} units banked with SBPDCL.`});
+      items.push({i:'💰',c:'rgba(16,185,129,.1)',tc:'var(--em)',
+        t:`Total value generated: ₹${rep.monthly_gain_inr || Math.round(rep.monthly_energy_kwh*rate)}`,
+        d:`₹${Math.round(selfConsumed*rate)} self-consumption savings + ₹${Math.round(exported*rate)} banked credit.`});
+    }
+
+    // Cumulative
+    items.push({i:'📈',c:'rgba(139,92,246,.1)',tc:'var(--vi)',
+      t:`Cumulative: ${rep.cumulative_kwh.toLocaleString()} kWh since install`,
+      d:`Plant installed ${rep.installation_date}. Total savings ≈ ₹${Math.round(rep.cumulative_kwh*rate).toLocaleString()}`});
+  }
+
+  // Overall trend
+  if(solarReports.length >= 2) {
+    const totalGen = solarReports.reduce((s,r)=>s+r.monthly_energy_kwh,0);
+    const avgMo    = (totalGen/solarReports.length).toFixed(0);
+    items.push({i:'📊',c:'rgba(14,165,233,.1)',tc:'var(--sky)',
+      t:`Avg monthly generation: ${avgMo} kWh across ${solarReports.length} months`,
+      d:`Total lifetime generation tracked: ${totalGen.toFixed(1)} kWh = ₹${Math.round(totalGen*rate).toLocaleString()} value`});
+  }
+
+  if(!items.length) {
+    document.getElementById('solar-insights').innerHTML = `<div class="icard"><div class="iicon" style="background:rgba(234,179,8,.1)">☀️</div><div><h4 style="font-weight:800;font-size:13px">Upload a plant report to see insights</h4><p style="font-size:11px;color:var(--muted)">Drag your monthly XLS generation report above.</p></div></div>`;
+    return;
+  }
+
+  document.getElementById('solar-insights').innerHTML =
+    `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">` +
+    items.map(x=>`<div class="icard"><div class="iicon" style="background:${x.c};color:${x.tc}">${x.i}</div>
+      <div><h4 style="font-weight:800;font-size:12px;color:${x.tc};margin-bottom:2px">${x.t}</h4>
+      <p style="font-size:11px;color:var(--muted);font-weight:600;line-height:1.45">${x.d}</p></div></div>`).join('') +
+    `</div>`;
+}
+
+function renderSolarHistory() {
+  const tb = document.getElementById('sol-hist-body');
+  if(!tb) return;
+  if(!solarReports.length) {
+    tb.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);font-weight:700">No plant reports uploaded yet</td></tr>`;
+    return;
+  }
+  tb.innerHTML = [...solarReports].reverse().map(r =>
+    `<tr>
+      <td><b>${r.report_month}</b></td>
+      <td>${r.plant_name}</td>
+      <td class="mono">${r.design_power_kw}</td>
+      <td class="mono" style="color:var(--volt-d);font-weight:800">${r.monthly_energy_kwh.toFixed(1)}</td>
+      <td class="mono" style="color:var(--em)">₹${(r.monthly_gain_inr||0).toFixed(0)}</td>
+      <td class="mono">Day ${r.peak_day} · ${r.peak_kwh} kWh</td>
+      <td class="mono">${r.avg_daily_kwh} kWh</td>
+      <td class="mono" style="color:${r.zero_days>0?'var(--rose)':'var(--em)'}">${r.zero_days}</td>
+      <td class="mono">${r.cumulative_kwh.toLocaleString()}</td>
+      <td><button onclick="delSolarReport(${r.id})" style="background:none;border:none;color:var(--rose);cursor:pointer"><i class="fa-solid fa-trash"></i></button></td>
+    </tr>`
+  ).join('');
+}
+
+function delSolarReport(id) {
+  if(!confirm('Delete this report?')) return;
+  solarReports = solarReports.filter(r => r.id !== id);
+  saveSolarLocal(); renderSolar(); toast('Report deleted');
+}
+
+// ═══════════════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════════════
 function famt(v) {
@@ -1643,16 +2153,14 @@ function famt(v) {
   return n < 0 ? `-₹${Math.abs(n)}` : `₹${n}`;
 }
 
+init();
 // ═══════════════════════════════════════════════════
-//  AI KEY MANAGEMENT
-// ═══════════════════════════════════════════════════
-const AI_KEYS = { groq:'groq_key', gemini:'gemini_key', openrouter:'or_key' };
+const AI_KEYS = { groq:'groq_key', openrouter:'or_key' };
 
 function getActiveAIEngine() {
   if(window._activeEngine) return window._activeEngine;
-  if(localStorage.getItem('groq_key'))   return 'groq';
-  if(localStorage.getItem('gemini_key')) return 'gemini';
-  if(localStorage.getItem('or_key'))     return 'openrouter';
+  if(localStorage.getItem('groq_key')) return 'groq';
+  if(localStorage.getItem('or_key'))   return 'openrouter';
   return null;
 }
 
